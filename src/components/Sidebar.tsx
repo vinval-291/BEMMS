@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
+import { INSTITUTION_NAME } from '../constants';
 import {
   LayoutDashboard,
   ClipboardList,
@@ -59,7 +60,7 @@ export default function Sidebar({ activeTab, setActiveTab, mobileOpen, onClose }
             </div>
             <div className="min-w-0">
               <h2 className="font-bold text-lg text-white leading-tight">BEMMS</h2>
-              <p className="font-mono text-[10px] text-slate-400 uppercase tracking-wider">St. Jude's Hospital</p>
+              <p className="font-mono text-[10px] text-slate-400 uppercase tracking-wider truncate">{INSTITUTION_NAME}</p>
             </div>
           </div>
 

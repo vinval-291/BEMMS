@@ -1,6 +1,7 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Job, MaintenanceType, JobStatus, Equipment } from '../types';
+import { INSTITUTION_SHORT_NAME } from '../constants';
 import {
   BookOpen,
   Calendar,
@@ -543,7 +544,7 @@ export default function WorkDoneBookView() {
         <div className="lg:col-span-4 bg-slate-900/50 rounded-2xl border border-slate-800 p-6 self-start space-y-5">
           <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
             <div>
-              <h3 className="text-xs font-semibold uppercase font-mono text-slate-300">St. Jude Daily Activity Feed</h3>
+              <h3 className="text-xs font-semibold uppercase font-mono text-slate-300">{INSTITUTION_SHORT_NAME} Daily Activity Feed</h3>
               <p className="text-[11px] text-slate-500 mt-0.5">Live index matches historic logs.</p>
             </div>
             <Database className="w-4 h-4 text-emerald-400" />

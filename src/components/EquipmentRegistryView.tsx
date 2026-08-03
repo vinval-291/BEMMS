@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Equipment, EquipmentCategory, EquipmentStatus } from '../types';
+import { INSTITUTION_SHORT_NAME } from '../constants';
 import {
   Plus,
   Search,
@@ -441,7 +442,7 @@ export default function EquipmentRegistryView() {
         <div className="md:col-span-8 space-y-3">
           <div className="flex items-center justify-between text-xs text-slate-500 font-mono">
             <span>SHOWING {filteredEquipment.length} BIOMEDICAL RECORDS</span>
-            <span>ST. JUDE HOSPITAL STORES</span>
+            <span className="uppercase">{INSTITUTION_SHORT_NAME} HOSPITAL STORES</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -565,7 +566,7 @@ export default function EquipmentRegistryView() {
                 <button
                   id="delete-asset-btn"
                   onClick={async () => {
-                    if (confirm(`Do you deeply authorize the total removal of equipment ${viewingEquipment.id} from St Jude primary archives?`)) {
+                    if (confirm(`Do you authorize the permanent removal of equipment ${viewingEquipment.id} from the ${INSTITUTION_SHORT_NAME} primary archives?`)) {
                       await deleteEquipment(viewingEquipment.id);
                       setViewingEquipment(null);
                     }
@@ -581,7 +582,7 @@ export default function EquipmentRegistryView() {
           ) : (
             <div className="text-center py-16 text-slate-500 space-y-3">
               <QrCode className="w-10 h-10 mx-auto text-slate-600 animate-pulse" />
-              <p className="text-xs font-mono">Select diagnostic equipment of St Jude or scan QR above to index compliance timelines.</p>
+              <p className="text-xs font-mono">Select {INSTITUTION_SHORT_NAME} diagnostic equipment or scan QR above to index compliance timelines.</p>
             </div>
           )}
         </div>
@@ -661,7 +662,7 @@ export default function EquipmentRegistryView() {
                 <button
                   type="button"
                   onClick={async () => {
-                    if (confirm(`Do you deeply authorize the total removal of equipment ${viewingEquipment.id} from St Jude primary archives?`)) {
+                    if (confirm(`Do you authorize the permanent removal of equipment ${viewingEquipment.id} from the ${INSTITUTION_SHORT_NAME} primary archives?`)) {
                       await deleteEquipment(viewingEquipment.id);
                       setViewingEquipment(null);
                     }

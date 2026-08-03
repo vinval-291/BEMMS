@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { BOOTSTRAP_ADMIN_EMAIL } from '../constants';
+import { BOOTSTRAP_ADMIN_EMAIL, INSTITUTION_NAME } from '../constants';
 import { AppUser, UserRole } from '../types';
 import {
   Shield,
@@ -133,7 +133,7 @@ export default function AdministrationView() {
   const triggerBackup = () => {
     const backupObj = {
       timestamp: new Date().toISOString(),
-      institution: "St. Jude's General Hospital",
+      institution: INSTITUTION_NAME,
       schema_version: "1.0.1",
       compliance_flags: ["ISO-13485", "HIPAA-Shield"]
     };
@@ -263,7 +263,7 @@ export default function AdministrationView() {
                   <input
                     type="email"
                     required
-                    placeholder="e.g. engineer.name@stjudes.org"
+                    placeholder="e.g. engineer.name@hospital.org"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-650 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"

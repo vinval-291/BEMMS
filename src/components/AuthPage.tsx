@@ -94,7 +94,7 @@ export default function AuthPage() {
             <input
               type="email"
               disabled={loading}
-              placeholder="e.g. engineer.name@stjudes.org"
+              placeholder="e.g. engineer.name@hospital.org"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition duration-200"

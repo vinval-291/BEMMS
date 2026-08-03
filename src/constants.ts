@@ -6,8 +6,8 @@
 export const BOOTSTRAP_ADMIN_EMAIL = 'kuteyioluwaloyevincent291@gmail.com';
 
 /** Institution shown in the app shell and on the sign-in screen. */
-export const INSTITUTION_NAME = "St. Jude's General Hospital";
-export const INSTITUTION_SHORT_NAME = "St. Jude's";
+export const INSTITUTION_NAME = 'General Hospital Lagos, Odan (GHL)';
+export const INSTITUTION_SHORT_NAME = 'GHL';
 
 /** Document ID prefixes for the human-readable record identifiers. */
 export const EQUIPMENT_ID_PREFIX = 'EQ-';

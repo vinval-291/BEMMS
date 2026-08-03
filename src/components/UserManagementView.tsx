@@ -814,7 +814,7 @@ export default function UserManagementView() {
                   <input
                     type="email"
                     required
-                    placeholder="e.g. engineer@stjudes.org"
+                    placeholder="e.g. engineer@hospital.org"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-teal-500"
