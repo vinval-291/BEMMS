@@ -12,176 +12,8 @@ import {
   Camera,
   Heart,
   UserCheck,
-  FileSpreadsheet,
-  Sparkles,
-  ChevronDown,
-  ChevronUp,
   Database
 } from 'lucide-react';
-
-interface ScreenshotPreset {
-  id: string;
-  rowNum: string;
-  ward: string;
-  name: string;
-  model: string;
-  workDone: string;
-  dateCompleted: string;
-  userName: string;
-  designation: string;
-  deviceMatchingId: string;
-  maintenanceType: MaintenanceType;
-  faultReported: string;
-  rootCauseAnalysis: string;
-  sparePartsUsed: string;
-}
-
-const SCREENSHOT_PRESETS: ScreenshotPreset[] = [
-  {
-    id: "70",
-    rowNum: "Row 70",
-    ward: "LADEMS Lab",
-    name: "Haematocrit Centrifuge",
-    model: "Haendorf 1400",
-    workDone: "Electrical motor repair",
-    dateCompleted: "2026-04-01",
-    userName: "Dr. Kolade",
-    designation: "Lab Director",
-    deviceMatchingId: "EQ-0070",
-    maintenanceType: "Corrective Maintenance",
-    faultReported: "Rotor fails to spin or start. Visual sparking visible at base unit with electric smoke during high load requests.",
-    rootCauseAnalysis: "Carbon brushes fully eroded down to mounting spring with severe stator copper coil corrosion from chemical vapors.",
-    sparePartsUsed: "Replacement high-density carbon brushes, copper winding insulator spray",
-  },
-  {
-    id: "71",
-    rowNum: "Row 71",
-    ward: "Casualty",
-    name: "Bed Screen",
-    model: "BS-STD Bracket",
-    workDone: "Installation of portable folding privacy screens",
-    dateCompleted: "2026-04-01",
-    userName: "Superintendent Kolade",
-    designation: "Casualty Coordinator",
-    deviceMatchingId: "EQ-0071",
-    maintenanceType: "Installation",
-    faultReported: "Lack of private boundaries around triage treatment beds 1 and 2 in casualty corridors.",
-    rootCauseAnalysis: "Newly provisioned screens require physical bracket anchoring into masonry walls.",
-    sparePartsUsed: "Masonry expansion brackets, stainless wall hinges",
-  },
-  {
-    id: "72",
-    rowNum: "Row 72",
-    ward: "Chemical Pathology",
-    name: "Centrifuge",
-    model: "80-2 Laboratory",
-    workDone: "Reattachment of dislodged lid safety parts for proper use",
-    dateCompleted: "2026-04-01",
-    userName: "MLS Bodunde",
-    designation: "Medical Lab Scientist",
-    deviceMatchingId: "EQ-0072",
-    maintenanceType: "Corrective Maintenance",
-    faultReported: "Laboratory Centrifuge lid safety interlocking latch dislodged, causing high imbalance vibrations.",
-    rootCauseAnalysis: "Repetitive mechanical closure of lid loosened microswitch brackets on internal framing.",
-    sparePartsUsed: "Safety latch replacement screws, thread locker adhesive",
-  },
-  {
-    id: "73",
-    rowNum: "Row 73",
-    ward: "Histopathology",
-    name: "Tissue Embedding Centre",
-    model: "TEC-HD Embedded",
-    workDone: "Servicing and reconnection of heating elements for continuous machine usage",
-    dateCompleted: "2026-04-01",
-    userName: "MLS HOD of Lab",
-    designation: "Lab Superintendent",
-    deviceMatchingId: "EQ-0073",
-    maintenanceType: "Corrective Maintenance",
-    faultReported: "Paraffin wax chamber dispenser blocked. Heat coils fail to reach melting temperature threshold (60C).",
-    rootCauseAnalysis: "Thermal cyclic wire scaling caused fatigue fracture at primary terminal connectors.",
-    sparePartsUsed: "Ceramic high-temp terminal blocks, replacement connecting wire leads",
-  },
-  {
-    id: "74",
-    rowNum: "Row 74",
-    ward: "Physiotherapy",
-    name: "Infrared Lamp",
-    model: "IR-LAMP-74 mobile",
-    workDone: "Repair of infrared lamp arm and flexible spring sheathing",
-    dateCompleted: "2026-04-01",
-    userName: "Physio Coordinator",
-    designation: "Chief Therapist",
-    deviceMatchingId: "EQ-0074",
-    maintenanceType: "Corrective Maintenance",
-    faultReported: "Infrared coil bulb fails to illuminate. Rigid posture arm does not hold specified clinical configurations.",
-    rootCauseAnalysis: "Internal copper power conduit sheath severed inside flexible elbow hinge joint.",
-    sparePartsUsed: "Silicone insulated power wire, joint adjustment washer",
-  },
-  {
-    id: "75",
-    rowNum: "Row 75",
-    ward: "E1 Ward",
-    name: "Ward Screen (E1)",
-    model: "WS-E1 Double Track",
-    workDone: "Installation of portable bed dividers and privacy screen sets",
-    dateCompleted: "2026-04-01",
-    userName: "Nurse Supervisor",
-    designation: "Senior Ward Sister",
-    deviceMatchingId: "EQ-0075",
-    maintenanceType: "Installation",
-    faultReported: "Provision and layout installation of wall-mount folding screen curtains at pediatric triage rows.",
-    rootCauseAnalysis: "Installation request to fulfill clinical confidentiality laws for newly arrived beds.",
-    sparePartsUsed: "Dual folding curtain track frames, bracket rawlplugs",
-  },
-  {
-    id: "76",
-    rowNum: "Row 76",
-    ward: "D1 Ward",
-    name: "Ward Screen (D1)",
-    model: "WS-D1 Single Rail",
-    workDone: "Installation of partition curtains",
-    dateCompleted: "2026-04-01",
-    userName: "Ward Coordinator",
-    designation: "Ward Sister",
-    deviceMatchingId: "EQ-0076",
-    maintenanceType: "Installation",
-    faultReported: "Mounting partition barriers behind newly added ICU isolation cot in Ward D1 floor.",
-    rootCauseAnalysis: "Asset allocation of portable partitioning curtain set.",
-    sparePartsUsed: "Aluminium screen mounting track, ceiling glider clips",
-  },
-  {
-    id: "77",
-    rowNum: "Row 77",
-    ward: "D1 Ward",
-    name: "Suction Machine",
-    model: "SM-77 Low Pressure",
-    workDone: "Replacement of faulty starting capacitor for proper functionality",
-    dateCompleted: "2026-04-01",
-    userName: "D1 Pediatric Nurse",
-    designation: "Registered Nurse",
-    deviceMatchingId: "EQ-0077",
-    maintenanceType: "Corrective Maintenance",
-    faultReported: "Rotary pump motor buzzing but fails to rotate or create suction pressure.",
-    rootCauseAnalysis: "Blown hermetic start capacitor (rated 12uF, measured 0.1uF), causing motor startup stall under clinical pressure.",
-    sparePartsUsed: "Heavy duty 12uF 450V AC Starting Capacitor",
-  },
-  {
-    id: "78",
-    rowNum: "Row 78",
-    ward: "Sterilization Unit",
-    name: "Autoclave Machine",
-    model: "Winco Sterilizer",
-    workDone: "Realignment of pressure door control safety systems and general servicing",
-    dateCompleted: "2026-04-01",
-    userName: "HOD CSSD",
-    designation: "CSSD Superintendent",
-    deviceMatchingId: "EQ-0078",
-    maintenanceType: "Corrective Maintenance",
-    faultReported: "Pressure door latch limit switches fail to engage. Autoclave cycle starts but cancels immediately.",
-    rootCauseAnalysis: "Excessive physical loading torque shifted door alignment latch hinge away from microswitch target pin.",
-    sparePartsUsed: "Replacement silicone pressure gasket, alignment door shim",
-  }
-];
 
 export default function WorkDoneBookView() {
   const { equipment, jobs, addJob, currentUser } = useApp();
@@ -226,10 +58,6 @@ export default function WorkDoneBookView() {
 
   const [submitting, setSubmitting] = useState(false);
 
-  // Custom spreadsheet loaders state
-  const [showScreenshotLogs, setShowScreenshotLogs] = useState(true);
-  const [activeLoadedPreset, setActiveLoadedPreset] = useState<string | null>(null);
-
   // Sync logged in user if changed
   useEffect(() => {
     if (currentUser) {
@@ -244,27 +72,6 @@ export default function WorkDoneBookView() {
       setSelectedEquipId(equipment[0].id);
     }
   }, [equipment, selectedEquipId]);
-
-  // Prepopulate form inputs from a screenshot manual row
-  const handleAutofillPreset = (p: ScreenshotPreset) => {
-    // Select the device
-    setSelectedEquipId(p.deviceMatchingId);
-    setMaintenanceType(p.maintenanceType);
-    setJobStatus('Completed');
-    setFaultReported(p.faultReported);
-    setTechnicalWorkDone(p.workDone);
-    setRootCauseAnalysis(p.rootCauseAnalysis);
-    setSparePartsUsed(p.sparePartsUsed);
-    setUserName(p.userName);
-    setUserDesignation(p.designation);
-    setUserDepartment(p.ward);
-    setBeforePhoto('');
-    setAfterPhoto('');
-    setActiveLoadedPreset(p.id);
-
-    // Signature pads are deliberately left blank â€” the engineer and the ward
-    // user still have to sign the entry by hand before it can be filed.
-  };
 
   // Helper to start canvas paint strokes
   const startDrawing = (e: React.MouseEvent | React.TouchEvent, pad: 'engineer' | 'user') => {
@@ -418,7 +225,6 @@ export default function WorkDoneBookView() {
       setUserDepartment('');
       setBeforePhoto('');
       setAfterPhoto('');
-      setActiveLoadedPreset(null);
 
       // Clear canvasses
       clearCanvas('engineer');
@@ -445,146 +251,6 @@ export default function WorkDoneBookView() {
         </p>
       </div>
 
-      {/* SPREADSHEET DISCOVERY LOGS PANEL */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-        <button
-          type="button"
-          onClick={() => setShowScreenshotLogs(!showScreenshotLogs)}
-          className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-900/90 transition focus:outline-none"
-        >
-          <div className="flex items-center space-x-3">
-            <span className="p-2 rounded-xl bg-teal-500/10 text-teal-400 border border-teal-500/20">
-              <FileSpreadsheet className="w-4 h-4" />
-            </span>
-            <div>
-              <span className="text-[10px] font-mono text-teal-400 font-extrabold uppercase tracking-widest block leading-3">Live Log Prepopulator</span>
-              <h2 className="text-xs font-bold text-white uppercase mt-0.5">Spreadsheet Asset Discovery (S/N 70â€“78)</h2>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="text-[10px] font-mono bg-slate-950 text-slate-400 px-2 py-0.5 rounded border border-slate-800/80">
-              9 PRE-PARSED RECORDS
-            </span>
-            {showScreenshotLogs ? (
-              <ChevronUp className="w-4 h-4 text-slate-400" />
-            ) : (
-              <ChevronDown className="w-4 h-4 text-slate-400" />
-            )}
-          </div>
-        </button>
-
-        {showScreenshotLogs && (
-          <div className="border-t border-slate-800 bg-slate-950 p-4">
-            <p className="text-xs text-slate-400 mb-4 font-mono leading-relaxed max-w-2xl">
-              We parsed the physical ledger/spreadsheet layout from your screenshot directly into real-time template loaders. 
-              Clicking any row will <span className="text-teal-400 font-semibold">instantly stream all fields</span> in real-time onto the active Job Action Sheet form below and auto-sign the authorization canvas.
-            </p>
-
-            {/* Desktop-only view table */}
-            <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-800/80">
-              <table className="w-full text-left font-mono text-[11px] text-slate-300">
-                <thead className="bg-slate-900 text-slate-400 border-b border-slate-800 uppercase text-[10px] tracking-wider text-center">
-                  <tr>
-                    <th className="p-2 text-left">S/N</th>
-                    <th className="p-2 text-left">Ward / Location</th>
-                    <th className="p-2 text-left">Equipment Name</th>
-                    <th className="p-2 text-left">Model Number</th>
-                    <th className="p-2 text-left text-teal-400">Manual Work Done / Maintenance</th>
-                    <th className="p-2">Completed</th>
-                    <th className="p-2">Clinician</th>
-                    <th className="p-2 text-right">Integrations</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/40">
-                  {SCREENSHOT_PRESETS.map((p) => {
-                    const isSelected = activeLoadedPreset === p.id;
-                    return (
-                      <tr 
-                        key={p.id}
-                        className={`hover:bg-teal-900/10 transition cursor-pointer ${
-                          isSelected ? "bg-teal-950/20 border-l-2 border-l-teal-500" : ""
-                        }`}
-                        onClick={() => handleAutofillPreset(p)}
-                      >
-                        <td className="p-2.5 font-bold text-center text-slate-500">{p.id}</td>
-                        <td className="p-2.5 text-slate-300 font-semibold">{p.ward}</td>
-                        <td className="p-2.5 text-white font-bold">{p.name}</td>
-                        <td className="p-2.5 text-emerald-400 font-mono font-semibold">{p.model}</td>
-                        <td className="p-2.5 text-slate-300 italic max-w-sm truncate text-left">{p.workDone}</td>
-                        <td className="p-2.5 text-center text-slate-400 text-[10px]">{p.dateCompleted}</td>
-                        <td className="p-2.5 text-center font-bold text-amber-400">{p.userName}</td>
-                        <td className="p-2.5 text-right">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAutofillPreset(p);
-                            }}
-                            className={`px-3 py-1 text-[10px] font-mono font-bold rounded-lg transition-all ${
-                              isSelected 
-                                ? "bg-teal-500 text-slate-950 shadow-md shadow-teal-500/20" 
-                                : "bg-slate-900 hover:bg-teal-500 hover:text-slate-950 text-teal-400 border border-slate-800"
-                            }`}
-                          >
-                            {isSelected ? "Active Loaded âœ“" : "Load âš¡"}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile-only view list (shown on small viewports) */}
-            <div className="block md:hidden space-y-3">
-              {SCREENSHOT_PRESETS.map((p) => {
-                const isSelected = activeLoadedPreset === p.id;
-                return (
-                  <div
-                    key={p.id}
-                    onClick={() => handleAutofillPreset(p)}
-                    className={`p-3 rounded-xl border text-slate-300 space-y-2.5 transition cursor-pointer ${
-                      isSelected 
-                        ? "bg-teal-500/10 border-teal-500/40" 
-                        : "bg-slate-900/40 border-slate-800"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-mono text-slate-500 font-bold">LEDGER S/N {p.id}</span>
-                      <span className="text-[10px] font-mono text-teal-400 font-semibold bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/20">{p.model}</span>
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-xs text-white">{p.name}</h4>
-                      <p className="text-[10.5px] text-slate-400 mt-0.5">{p.ward} â€¢ {p.dateCompleted}</p>
-                    </div>
-                    <p className="text-[11px] italic text-slate-300 bg-slate-950/60 p-2 rounded border border-slate-800/40">
-                      "{p.workDone}"
-                    </p>
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="text-[10px] font-mono text-amber-400">{p.userName}</span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAutofillPreset(p);
-                        }}
-                        className={`px-3 py-1.5 text-[10px] font-mono font-bold rounded-lg transition-all ${
-                          isSelected 
-                            ? "bg-teal-500 text-slate-950 font-bold shadow-md shadow-teal-500/20" 
-                            : "bg-slate-900 hover:bg-teal-500 hover:text-slate-950 text-teal-400 border border-slate-800"
-                        }`}
-                      >
-                        {isSelected ? "Active âœ“" : "Load âš¡"}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
@@ -596,11 +262,6 @@ export default function WorkDoneBookView() {
               <PenTool className="w-4 h-4 text-teal-400" />
               <span>Job Action Sheet Form</span>
             </h3>
-            {activeLoadedPreset && (
-              <span className="text-[10px] font-mono bg-teal-500/10 text-teal-400 px-2.5 py-1 rounded-full border border-teal-500/30 animate-pulse font-bold">
-                STREAMED FROM SCREENSHOT S/N {activeLoadedPreset}
-              </span>
-            )}
             <span className="text-[10px] font-mono text-teal-400 uppercase">ISO 13485 Standards</span>
           </div>
 
