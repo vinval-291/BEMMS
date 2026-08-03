@@ -31,7 +31,7 @@ export default function WorkDoneBookView() {
   const [sparePartsUsed, setSparePartsUsed] = useState('');
 
   // Staff Signatures Canvas
-  const [engineerName, setEngineerName] = useState(currentUser?.name || 'Engr. Sarah Adams');
+  const [engineerName, setEngineerName] = useState(currentUser?.name || '');
   const [engineerDesignation, setEngineerDesignation] = useState(currentUser?.designation || 'Clinical Engineer II');
   
   // User check confirmations

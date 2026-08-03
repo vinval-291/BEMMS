@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 export default function AdministrationView() {
-  const { currentUser } = useApp();
+  const { currentUser, equipment, jobs, schedules } = useApp();
   const [usersList, setUsersList] = useState<AppUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState<boolean>(true);
 
@@ -131,19 +131,37 @@ export default function AdministrationView() {
   };
 
   const triggerBackup = () => {
+    // Exports the actual records, not just a manifest, so the file is a usable
+    // snapshot of the registry, logbook, schedules and staff directory.
     const backupObj = {
       timestamp: new Date().toISOString(),
       institution: INSTITUTION_NAME,
-      schema_version: "1.0.1",
-      compliance_flags: ["ISO-13485", "HIPAA-Shield"]
+      schema_version: '1.0.1',
+      compliance_flags: ['ISO-13485', 'HIPAA-Shield'],
+      counts: {
+        equipment: equipment.length,
+        jobs: jobs.length,
+        schedules: schedules.length,
+        users: usersList.length
+      },
+      equipment,
+      jobs,
+      schedules,
+      users: usersList
     };
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupObj, null, 2));
+
+    const blob = new Blob([JSON.stringify(backupObj, null, 2)], {
+      type: 'application/json;charset=utf-8'
+    });
+    const url = URL.createObjectURL(blob);
+
     const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `BEMMS_Backup_${new Date().toISOString().split('T')[0]}.json`);
+    downloadAnchor.href = url;
+    downloadAnchor.setAttribute('download', `BEMMS_Backup_${new Date().toISOString().split('T')[0]}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
+    URL.revokeObjectURL(url);
   };
 
   const supportsRegistration = currentUser?.role === 'admin' || currentUser?.role === 'head';

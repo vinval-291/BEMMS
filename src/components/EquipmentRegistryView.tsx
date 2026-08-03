@@ -41,9 +41,11 @@ export default function EquipmentRegistryView() {
   const [serialNumber, setSerialNumber] = useState('');
   const [assetNumber, setAssetNumber] = useState('');
   const [ward, setWard] = useState('Intensive Care Unit (ICU)');
-  const [installationDate, setInstallationDate] = useState('2026-01-10');
-  const [purchaseDate, setPurchaseDate] = useState('2025-12-15');
-  const [warrantyExpiryDate, setWarrantyExpiryDate] = useState('2028-01-10');
+  // Blank by default and required on submit. Prefilled dates would otherwise be
+  // saved verbatim onto assets they do not describe.
+  const [installationDate, setInstallationDate] = useState('');
+  const [purchaseDate, setPurchaseDate] = useState('');
+  const [warrantyExpiryDate, setWarrantyExpiryDate] = useState('');
   const [status, setStatus] = useState<EquipmentStatus>('Active');
   const [photoUrl, setPhotoUrl] = useState('');
 
@@ -88,6 +90,10 @@ export default function EquipmentRegistryView() {
       alert('Please fill out all required fields to register the equipment.');
       return;
     }
+    if (!installationDate || !purchaseDate || !warrantyExpiryDate) {
+      alert('Installation, purchase and warranty expiry dates are required for the asset record.');
+      return;
+    }
 
     try {
       const newId = await addEquipment({
@@ -113,6 +119,9 @@ export default function EquipmentRegistryView() {
       setModelNumber('');
       setSerialNumber('');
       setAssetNumber('');
+      setInstallationDate('');
+      setPurchaseDate('');
+      setWarrantyExpiryDate('');
       setPhotoUrl('');
       setShowAddForm(false);
 

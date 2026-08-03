@@ -14,18 +14,22 @@ import {
 } from 'lucide-react';
 
 export default function SchedulerView() {
-  const { equipment, schedules, addSchedule, updateScheduleStatus } = useApp();
+  const { equipment, schedules, addSchedule, updateScheduleStatus, currentUser } = useApp();
 
   const [showAddForm, setShowAddForm] = useState(false);
 
+  // Reference dates are derived from the real clock, so overdue and due-soon
+  // alerts stay correct as time passes.
+  const asIsoDate = (d: Date) => d.toISOString().split('T')[0];
+  const TODAY_STR = asIsoDate(new Date());
+  const WEEK_AHEAD_STR = asIsoDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+  const DEFAULT_NEXT_DATE = asIsoDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+
   // Form parameters
   const [selectedEquipId, setSelectedEquipId] = useState('');
-  const [nextDate, setNextDate] = useState('2026-06-15');
+  const [nextDate, setNextDate] = useState(DEFAULT_NEXT_DATE);
   const [frequency, setFrequency] = useState<ScheduleFrequency>('quarterly');
-  const [assignedEngineerName, setAssignedEngineerName] = useState('Engr. Sarah Adams');
-
-  // Hardcoded active reference date matching current container context: "2026-06-11"
-  const TODAY_STR = '2026-06-11';
+  const [assignedEngineerName, setAssignedEngineerName] = useState(currentUser?.name || '');
 
   // Compute alerts dynamically from active, unfinished schedules
   const activeSchedules = schedules.filter(s => s.status !== 'completed');
@@ -36,9 +40,9 @@ export default function SchedulerView() {
   // 2. Due Today: date === today
   const dueTodaySchedules = activeSchedules.filter(s => s.nextMaintenanceDate === TODAY_STR);
 
-  // 3. Due This Week: date > today && date <= 7 days after today (2026-06-18)
-  const dueThisWeekSchedules = activeSchedules.filter(s => 
-    s.nextMaintenanceDate > TODAY_STR && s.nextMaintenanceDate <= '2026-06-18'
+  // 3. Due This Week: within the next seven days
+  const dueThisWeekSchedules = activeSchedules.filter(s =>
+    s.nextMaintenanceDate > TODAY_STR && s.nextMaintenanceDate <= WEEK_AHEAD_STR
   );
 
   const handleSubmit = async (e: React.FormEvent) => {

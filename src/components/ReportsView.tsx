@@ -16,8 +16,15 @@ import {
 export default function ReportsView() {
   const { jobs, equipment, schedules } = useApp();
 
-  const [chosenMonth, setChosenMonth] = useState<string>('06'); // June default
-  const [chosenYear, setChosenYear] = useState<string>('2026');
+  // Default to the current reporting period rather than a fixed month.
+  const today = new Date();
+  const [chosenMonth, setChosenMonth] = useState<string>(String(today.getMonth() + 1).padStart(2, '0'));
+  const [chosenYear, setChosenYear] = useState<string>(String(today.getFullYear()));
+
+  // Every year that has logged jobs, plus the current one, newest first.
+  const selectableYears = Array.from(
+    new Set([String(today.getFullYear()), ...jobs.map(j => j.date.split('-')[0]).filter(Boolean)])
+  ).sort((a, b) => Number(b) - Number(a));
 
   const monthsMap: { [key: string]: string } = {
     '01': 'January', '02': 'February', '03': 'March', '04': 'April',
@@ -39,8 +46,15 @@ export default function ReportsView() {
   const correctiveCount = monthlyJobs.filter(j => j.maintenanceType === 'Corrective Maintenance').length;
   const calibrationCount = monthlyJobs.filter(j => j.maintenanceType === 'Calibration').length;
 
-  // Downtime index (fictional index representation based on job counts)
-  const avgDowntimeHours = totalRepairs > 0 ? (correctiveCount * 4.5 + prevMaintCount * 1.5) / totalRepairs : 0;
+  // Planning estimate only. The logbook records the date a job was filed but not
+  // how long the device was out of service, so downtime cannot be measured from
+  // the data. These are nominal per-job durations; adjust them to match the
+  // department's own observed figures.
+  const NOMINAL_CORRECTIVE_HOURS = 4.5;
+  const NOMINAL_PREVENTIVE_HOURS = 1.5;
+  const avgDowntimeHours = totalRepairs > 0
+    ? (correctiveCount * NOMINAL_CORRECTIVE_HOURS + prevMaintCount * NOMINAL_PREVENTIVE_HOURS) / totalRepairs
+    : 0;
 
   // Spare Parts lists
   const partsUsedList = monthlyJobs
@@ -127,8 +141,9 @@ export default function ReportsView() {
                 onChange={(e) => setChosenYear(e.target.value)}
                 className="bg-slate-950 border border-slate-800 rounded-lg py-1 px-2.5 text-xs text-white focus:outline-none"
               >
-                <option value="2026">2026</option>
-                <option value="2025">2025</option>
+                {selectableYears.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
               </select>
 
             </div>
@@ -179,11 +194,13 @@ export default function ReportsView() {
         </div>
 
         <div className="bg-slate-900/50 p-5 border border-slate-800 rounded-xl space-y-2">
-          <span className="text-[10px] font-mono uppercase text-indigo-400 block font-bold">Avg Downtime Hours</span>
+          <span className="text-[10px] font-mono uppercase text-indigo-400 block font-bold">Est. Downtime / Job</span>
           <p className="text-3xl font-black text-indigo-400 font-mono leading-none">
             {avgDowntimeHours.toFixed(1)} hrs
           </p>
-          <span className="text-[10.5px] font-mono text-indigo-500 block pt-1 border-t border-slate-100/10">Mean corrective hours.</span>
+          <span className="text-[10.5px] font-mono text-indigo-500 block pt-1 border-t border-slate-100/10">
+            Estimate from nominal durations, not measured.
+          </span>
         </div>
 
       </div>

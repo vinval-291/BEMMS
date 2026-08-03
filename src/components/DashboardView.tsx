@@ -55,7 +55,7 @@ export default function DashboardView() {
       const mIdx = parts[1] ? parseInt(parts[1], 10) - 1 : -1;
       return mIdx >= 0 && months[mIdx] === month;
     });
-    return { name: month, count: matchingJobs.length + (month === 'Jun' ? 3 : month === 'May' ? 1 : 0) }; // Include baseline for aesthetics
+    return { name: month, count: matchingJobs.length };
   });
 
   // Calculate highest monthly count for SVG scaling
@@ -64,11 +64,15 @@ export default function DashboardView() {
   // 4. Frequent Fault Analysis keywords
   const allFaultsString = jobs.map(j => j.faultReported).join(' ');
   const keywords = ['sensor', 'power', 'calibration', 'flicker', 'battery', 'flow', 'alarm', 'pressure'];
-  const faultKeywordsMatched = keywords.map(kw => {
-    const rx = new RegExp(kw, 'gi');
-    const matches = allFaultsString.match(rx);
-    return { name: kw.charAt(0).toUpperCase() + kw.slice(1), count: matches ? matches.length : 1 };
-  }).sort((a, b) => b.count - a.count);
+  const faultKeywordsMatched = keywords
+    .map(kw => {
+      const rx = new RegExp(kw, 'gi');
+      const matches = allFaultsString.match(rx);
+      return { name: kw.charAt(0).toUpperCase() + kw.slice(1), count: matches ? matches.length : 0 };
+    })
+    // Only report terms that actually occur in the logged fault descriptions.
+    .filter(k => k.count > 0)
+    .sort((a, b) => b.count - a.count);
 
   return (
     <div className="space-y-6">
@@ -368,6 +372,11 @@ export default function DashboardView() {
           </p>
 
           <div className="flex flex-wrap gap-2">
+            {faultKeywordsMatched.length === 0 && (
+              <p className="text-xs font-mono text-slate-500">
+                No recurring keywords yet — they appear once faults are logged in the Work Done Book.
+              </p>
+            )}
             {faultKeywordsMatched.map((k, index) => {
               const bgTones = [
                 'bg-rose-500/10 text-rose-400 border-rose-500/20',
