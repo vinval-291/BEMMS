@@ -1,0 +1,17 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Local editor/agent state
+.claude/settings.local.json
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+functions/node_modules/

@@ -1,0 +1,126 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile containing roles, designation, and metadata.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "fullName": { "type": "string" },
+        "role": { "type": "string", "enum": ["engineer", "head", "admin"] },
+        "designation": { "type": "string" },
+        "department": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "active": { "type": "boolean" },
+        "createdBy": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "name", "role", "designation"]
+    },
+    "Equipment": {
+      "title": "Equipment",
+      "description": "Medical equipment record in the registry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "manufacturer": { "type": "string" },
+        "modelNumber": { "type": "string" },
+        "serialNumber": { "type": "string" },
+        "assetNumber": { "type": "string" },
+        "ward": { "type": "string" },
+        "installationDate": { "type": "string", "format": "date" },
+        "purchaseDate": { "type": "string", "format": "date" },
+        "warrantyExpiryDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["Active", "Under Repair", "Decommissioned", "Awaiting Spare Parts"] },
+        "photoUrl": { "type": "string" },
+        "qrCodeData": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "category", "manufacturer", "modelNumber", "serialNumber", "assetNumber", "ward", "status"]
+    },
+    "Job": {
+      "title": "Job",
+      "description": "A digital maintenance logbook entry (Work Done Book record).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "time": { "type": "string" },
+        "ward": { "type": "string" },
+        "equipmentName": { "type": "string" },
+        "equipmentId": { "type": "string" },
+        "modelNumber": { "type": "string" },
+        "serialNumber": { "type": "string" },
+        "faultReported": { "type": "string" },
+        "technicalWorkDone": { "type": "string" },
+        "rootCauseAnalysis": { "type": "string" },
+        "sparePartsUsed": { "type": "string" },
+        "maintenanceType": { "type": "string", "enum": ["Corrective Maintenance", "Preventive Maintenance", "Calibration", "Installation", "Inspection", "Upgrade"] },
+        "jobStatus": { "type": "string", "enum": ["Pending", "In Progress", "Completed", "Awaiting Spare Parts"] },
+        "engineerDetails": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "designation": { "type": "string" },
+            "signature": { "type": "string" }
+          },
+          "required": ["name", "designation", "signature"]
+        },
+        "userConfirmation": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "designation": { "type": "string" },
+            "department": { "type": "string" },
+            "signature": { "type": "string" }
+          },
+          "required": ["name", "designation", "department", "signature"]
+        },
+        "beforeRepairPhoto": { "type": "string" },
+        "afterRepairPhoto": { "type": "string" },
+        "serviceReportPdfUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "date", "time", "ward", "equipmentName", "equipmentId", "faultReported", "technicalWorkDone", "maintenanceType", "jobStatus", "engineerDetails", "userConfirmation"]
+    },
+    "Schedule": {
+      "title": "Schedule",
+      "description": "Preventive maintenance scheduled activity.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "equipmentId": { "type": "string" },
+        "equipmentName": { "type": "string" },
+        "nextMaintenanceDate": { "type": "string", "format": "date" },
+        "frequency": { "type": "string", "enum": ["monthly", "quarterly", "semi-annually", "annually"] },
+        "assignedEngineerId": { "type": "string" },
+        "assignedEngineerName": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "completed", "overdue"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "equipmentId", "equipmentName", "nextMaintenanceDate", "frequency", "assignedEngineerName", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "#/entities/User",
+      "description": "User profile details indexed by their Firebase Auth UID."
+    },
+    "/equipment/{equipmentId}": {
+      "schema": "#/entities/Equipment",
+      "description": "Medical equipment registry records."
+    },
+    "/jobs/{jobId}": {
+      "schema": "#/entities/Job",
+      "description": "Maintenance diagnostic logs and signatures."
+    },
+    "/schedules/{scheduleId}": {
+      "schema": "#/entities/Schedule",
+      "description": "Preventive maintenance alerts and tasks tracker."
+    }
+  }
+}

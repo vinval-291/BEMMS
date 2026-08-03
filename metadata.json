@@ -1,0 +1,8 @@
+{
+  "name": "Biomedical Engineering Maintenance Management System",
+  "description": "Digital platform replacing the paper-based Work Done Book for tracking hospital medical equipment registration, maintenance logs, preventive schedules, QR codes, and performance metrics.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

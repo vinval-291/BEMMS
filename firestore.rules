@@ -1,0 +1,144 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------------
+    // Identity helpers
+    // ---------------------------------------------------------------------
+
+    // The single designated bootstrap account. This account can always create
+    // its own profile document, which is what makes the very first sign-in
+    // possible against an empty database.
+    function bootstrapAdminEmail() {
+      return 'kuteyioluwaloyevincent291@gmail.com';
+    }
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.email != null;
+    }
+
+    function callerEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    function callerPath() {
+      return /databases/$(database)/documents/users/$(callerEmail());
+    }
+
+    function callerExists() {
+      return exists(callerPath());
+    }
+
+    function callerData() {
+      return get(callerPath()).data;
+    }
+
+    function isBootstrapAdmin() {
+      return signedIn() && callerEmail() == bootstrapAdminEmail();
+    }
+
+    // A caller is active if they are the bootstrap admin, or their profile
+    // exists and has not been deactivated. exists() is checked before get()
+    // so a missing profile denies cleanly instead of raising an error.
+    function isActive() {
+      return isBootstrapAdmin() ||
+             (signedIn() && callerExists() && callerData().active != false);
+    }
+
+    // The bootstrap admin always holds the admin role, even before their
+    // profile document has been written.
+    function hasRole(role) {
+      return (isBootstrapAdmin() && role == 'admin') ||
+             (signedIn() && callerExists() && callerData().role == role);
+    }
+
+    function isAdmin() {
+      return isActive() && hasRole('admin');
+    }
+
+    function isAdminOrHOD() {
+      return isActive() && (hasRole('admin') || hasRole('head'));
+    }
+
+    // Any active, registered staff member.
+    function isStaff() {
+      return isActive();
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128
+             && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // ---------------------------------------------------------------------
+    // 1. Users — authorization profiles, keyed by lowercased email address
+    // ---------------------------------------------------------------------
+    match /users/{email} {
+      allow read: if isStaff();
+
+      // Bootstrap path: the designated chief admin may always create and
+      // maintain their own profile.
+      allow create, update: if isBootstrapAdmin() && email.lower() == callerEmail();
+
+      // Admins and HODs manage the staff directory. An HOD may not create or
+      // promote anyone to admin, nor modify an existing admin's record.
+      allow create: if isAdminOrHOD()
+                    && (isAdmin() || request.resource.data.role != 'admin');
+
+      allow update: if isAdminOrHOD()
+                    && (isAdmin()
+                        || (resource.data.role != 'admin' && request.resource.data.role != 'admin'));
+
+      // Staff may maintain their own profile, but may not change their own
+      // role or reactivate themselves. diff() avoids touching fields that may
+      // be absent on either side.
+      allow update: if isStaff()
+                    && email.lower() == callerEmail()
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['uid', 'name', 'fullName', 'designation', 'department', 'updatedAt']);
+
+      // Nobody may delete their own account, so an admin cannot lock the
+      // system out of itself.
+      allow delete: if isAdminOrHOD()
+                    && email.lower() != callerEmail()
+                    && (isAdmin() || resource.data.role != 'admin');
+    }
+
+    // ---------------------------------------------------------------------
+    // 2. Equipment registry
+    // ---------------------------------------------------------------------
+    match /equipment/{equipmentId} {
+      allow read: if isStaff();
+      allow create, update: if isStaff() && isValidId(equipmentId);
+      allow delete: if isAdminOrHOD();
+    }
+
+    // ---------------------------------------------------------------------
+    // 3. Jobs — the Work Done Book maintenance log
+    // ---------------------------------------------------------------------
+    match /jobs/{jobId} {
+      allow read: if isStaff();
+      allow create: if isStaff() && isValidId(jobId);
+      // Completed log entries are an audit record; only admins and HODs may
+      // amend one after the fact.
+      allow update: if isAdminOrHOD() && isValidId(jobId);
+      allow delete: if isAdminOrHOD();
+    }
+
+    // ---------------------------------------------------------------------
+    // 4. Preventive maintenance schedules
+    // ---------------------------------------------------------------------
+    match /schedules/{scheduleId} {
+      allow read: if isStaff();
+      allow create, update: if isStaff() && isValidId(scheduleId);
+      allow delete: if isAdminOrHOD();
+    }
+
+    // ---------------------------------------------------------------------
+    // Default deny. Anything not matched above is unreachable.
+    // ---------------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
