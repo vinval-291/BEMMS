@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Equipment, EquipmentCategory, EquipmentStatus } from '../types';
+import { Equipment, EquipmentStatus } from '../types';
 import {
   INSTITUTION_NAME,
   INSTITUTION_SHORT_NAME,
@@ -39,7 +39,6 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
   
   // Filtering & Search
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   
   // UI states
@@ -49,7 +48,6 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
 
   // Form states for register
   const [name, setName] = useState('');
-  const [category, setCategory] = useState<EquipmentCategory>('Ventilator');
   const [manufacturer, setManufacturer] = useState('');
   const [modelNumber, setModelNumber] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
@@ -66,11 +64,6 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
   const [scanOpen, setScanOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
-
-  const categories: EquipmentCategory[] = [
-    'Ventilator', 'Defibrillator', 'ECG Machine', 'Ultrasound Machine', 'X-Ray Machine',
-    'Patient Monitor', 'Infusion Pump', 'Syringe Pump', 'Autoclave', 'Laboratory Equipment', 'Other'
-  ];
 
   const statuses: EquipmentStatus[] = ['Active', 'Under Repair', 'Decommissioned', 'Awaiting Spare Parts'];
 
@@ -111,7 +104,6 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
     try {
       const newId = await addEquipment({
         name,
-        category,
         manufacturer,
         modelNumber,
         serialNumber,
@@ -236,10 +228,9 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
       eq.assetNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       eq.ward.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const categoryMatch = categoryFilter === 'all' || eq.category === categoryFilter;
     const statusMatch = statusFilter === 'all' || eq.status === statusFilter;
 
-    return textMatch && categoryMatch && statusMatch;
+    return textMatch && statusMatch;
   });
 
   return (
@@ -357,21 +348,6 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
                 onChange={(e) => setName(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none"
               />
-            </div>
-
-            {/* Category */}
-            <div>
-              <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Category *</label>
-              <select
-                id="form-eq-category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value as EquipmentCategory)}
-                className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none"
-              >
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
             </div>
 
             {/* Manufacturer */}
@@ -498,22 +474,6 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
 
         <div>
           <select
-            id="registry-filter-category"
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-300 focus:outline-none focus:border-teal-500"
-          >
-            <option value="all">All Categories ({categories.length})</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <select
             id="registry-filter-status"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -614,7 +574,7 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
                     {viewingEquipment.id}
                   </span>
                   <h3 className="font-bold text-white text-base mt-2">{viewingEquipment.name}</h3>
-                  <p className="text-xs text-slate-400 font-mono mt-1">{viewingEquipment.category}</p>
+                  <p className="text-xs text-slate-400 font-mono mt-1">{viewingEquipment.manufacturer}</p>
                 </div>
               </div>
 
@@ -729,7 +689,7 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
                     {viewingEquipment.id}
                   </span>
                   <h3 className="font-bold text-white text-sm truncate mt-1">{viewingEquipment.name}</h3>
-                  <p className="text-[11px] text-slate-400 font-mono">{viewingEquipment.category}</p>
+                  <p className="text-[11px] text-slate-400 font-mono">{viewingEquipment.manufacturer}</p>
                 </div>
               </div>
 

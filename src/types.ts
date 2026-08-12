@@ -16,7 +16,8 @@ export type EquipmentCategory =
 export interface Equipment {
   id: string; // Document ID (Equipment ID)
   name: string;
-  category: EquipmentCategory;
+  /** No longer collected. Retained so records created earlier still load. */
+  category?: EquipmentCategory;
   manufacturer: string;
   modelNumber: string;
   serialNumber: string;
