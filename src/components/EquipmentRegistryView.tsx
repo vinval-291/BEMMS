@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Equipment, EquipmentCategory, EquipmentStatus } from '../types';
-import { INSTITUTION_SHORT_NAME } from '../constants';
+import {
+  INSTITUTION_NAME,
+  INSTITUTION_SHORT_NAME,
+  WARDS,
+  equipmentDeepLink,
+  parseEquipmentCode,
+} from '../constants';
+import QrScanner from './QrScanner';
 import {
   Plus,
   Search,
@@ -16,11 +23,18 @@ import {
   Calendar,
   Layers,
   Camera,
-  Layers3
+  Layers3,
+  Printer,
+  History
 } from 'lucide-react';
 import QRCode from 'qrcode';
 
-export default function EquipmentRegistryView() {
+interface EquipmentRegistryViewProps {
+  /** Opens a device's service history, used after a successful QR scan. */
+  onOpenHistory?: (equipmentId: string) => void;
+}
+
+export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegistryViewProps = {}) {
   const { equipment, addEquipment, deleteEquipment, currentUser } = useApp();
   
   // Filtering & Search
@@ -40,18 +54,17 @@ export default function EquipmentRegistryView() {
   const [modelNumber, setModelNumber] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
   const [assetNumber, setAssetNumber] = useState('');
-  const [ward, setWard] = useState('Intensive Care Unit (ICU)');
+  const [ward, setWard] = useState(WARDS[0]);
   // Blank by default and required on submit. Prefilled dates would otherwise be
   // saved verbatim onto assets they do not describe.
-  const [installationDate, setInstallationDate] = useState('');
   const [purchaseDate, setPurchaseDate] = useState('');
-  const [warrantyExpiryDate, setWarrantyExpiryDate] = useState('');
   const [status, setStatus] = useState<EquipmentStatus>('Active');
   const [photoUrl, setPhotoUrl] = useState('');
 
-  // Simulated scan state
+  // Scan state
   const [scanInputId, setScanInputId] = useState('');
   const [scanOpen, setScanOpen] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [scanFeedback, setScanFeedback] = useState<string | null>(null);
 
   const categories: EquipmentCategory[] = [
@@ -61,20 +74,20 @@ export default function EquipmentRegistryView() {
 
   const statuses: EquipmentStatus[] = ['Active', 'Under Repair', 'Decommissioned', 'Awaiting Spare Parts'];
 
-  const wards = [
-    'Intensive Care Unit (ICU)', 'Emergency Department (ER)', 'Cardiology Ward', 'Pediatric Ward',
-    'Operating Room (OR)', 'Central Sterile Services Dept (CSSD)', 'General Medicine', 'Radiology Unit'
-  ];
+  const wards = WARDS;
 
-  // Compile QR Code data URL asynchronously whenever selection changes
+  // Compile QR Code data URL asynchronously whenever selection changes.
+  // The label encodes a full URL so a phone's built-in camera can open the
+  // device's service history without any scanner app.
   useEffect(() => {
     if (viewingEquipment) {
-      QRCode.toDataURL(`bemms-equip:${viewingEquipment.id}`, { 
-        width: 180,
+      QRCode.toDataURL(equipmentDeepLink(viewingEquipment.id), {
+        width: 320,
         margin: 1,
+        errorCorrectionLevel: 'M',
         color: {
           dark: '#0f172a',
-          light: '#f1f5f9'
+          light: '#ffffff'
         }
       })
         .then(url => setQrBlobUrl(url))
@@ -90,8 +103,8 @@ export default function EquipmentRegistryView() {
       alert('Please fill out all required fields to register the equipment.');
       return;
     }
-    if (!installationDate || !purchaseDate || !warrantyExpiryDate) {
-      alert('Installation, purchase and warranty expiry dates are required for the asset record.');
+    if (!purchaseDate) {
+      alert('The purchase date is required for the asset record.');
       return;
     }
 
@@ -104,9 +117,7 @@ export default function EquipmentRegistryView() {
         serialNumber,
         assetNumber,
         ward,
-        installationDate,
         purchaseDate,
-        warrantyExpiryDate,
         status,
         // Left blank when no photo was supplied; the registry renders a
         // placeholder rather than storing an unrelated stock image.
@@ -119,9 +130,7 @@ export default function EquipmentRegistryView() {
       setModelNumber('');
       setSerialNumber('');
       setAssetNumber('');
-      setInstallationDate('');
       setPurchaseDate('');
-      setWarrantyExpiryDate('');
       setPhotoUrl('');
       setShowAddForm(false);
 
@@ -132,17 +141,90 @@ export default function EquipmentRegistryView() {
     }
   };
 
-  const handleSimulateScan = () => {
-    setScanFeedback(null);
-    const target = equipment.find(e => e.id.toLowerCase() === scanInputId.trim().toLowerCase() || e.assetNumber.toLowerCase() === scanInputId.trim().toLowerCase());
-    if (target) {
-      setViewingEquipment(target);
-      setScanFeedback(`Successfully parsed QR code for Device ID: ${target.id}. Profile loaded!`);
-      setScanInputId('');
-      setScanOpen(false);
-    } else {
-      setScanFeedback('No matching equipment ID found. Enter a valid ID like \"EQ-0980\" or \"EQ-2001\" to simulate scanning the QR.');
+  /**
+   * Resolves a scanned or typed code to a device and opens its service history.
+   * Accepts a QR label URL, the older bemms-equip: scheme, a device ID or an
+   * asset number.
+   */
+  const resolveScannedCode = (raw: string) => {
+    const wanted = parseEquipmentCode(raw).toLowerCase();
+    if (!wanted) return;
+
+    const target = equipment.find(
+      e => e.id.toLowerCase() === wanted || e.assetNumber.toLowerCase() === wanted
+    );
+
+    if (!target) {
+      setScanFeedback(`No device matching "${parseEquipmentCode(raw)}" is in the registry.`);
+      return;
     }
+
+    setScanFeedback(null);
+    setScanInputId('');
+    setScanOpen(false);
+    setCameraOpen(false);
+
+    if (onOpenHistory) {
+      onOpenHistory(target.id);
+    } else {
+      // Standalone fallback: show the device profile in place.
+      setViewingEquipment(target);
+    }
+  };
+
+  const handleManualScanLookup = () => resolveScannedCode(scanInputId);
+
+  /** Opens a print dialog containing just the QR label for the shown device. */
+  const handlePrintLabel = () => {
+    if (!viewingEquipment || !qrBlobUrl) return;
+
+    const win = window.open('', '_blank', 'width=460,height=640');
+    if (!win) {
+      alert('The print window was blocked. Allow pop-ups for this site and try again.');
+      return;
+    }
+
+    const esc = (s: string) =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    win.document.write(`<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>${esc(viewingEquipment.id)} — ${esc(viewingEquipment.name)}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #0f172a; }
+  .label { width: 62mm; border: 1.5px solid #0f172a; border-radius: 6px; padding: 8px 8px 10px; text-align: center; page-break-inside: avoid; }
+  .brand { font-size: 8px; letter-spacing: 1.6px; text-transform: uppercase; font-weight: 700; color: #0f766e; }
+  .inst { font-size: 6.5px; letter-spacing: .6px; text-transform: uppercase; color: #475569; margin-top: 1px; }
+  img { width: 42mm; height: 42mm; display: block; margin: 6px auto 4px; }
+  .id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; font-weight: 800; letter-spacing: .5px; }
+  .name { font-size: 9px; font-weight: 600; margin-top: 2px; line-height: 1.25; }
+  .meta { font-size: 7px; color: #475569; margin-top: 3px; line-height: 1.3; }
+  .hint { font-size: 6px; color: #64748b; margin-top: 5px; border-top: .5px solid #cbd5e1; padding-top: 3px; }
+  @media print { body { padding: 0; } @page { margin: 8mm; } }
+</style>
+</head>
+<body>
+  <div class="label">
+    <div class="brand">BEMMS</div>
+    <div class="inst">${esc(INSTITUTION_NAME)}</div>
+    <img src="${qrBlobUrl}" alt="QR code for ${esc(viewingEquipment.id)}" />
+    <div class="id">${esc(viewingEquipment.id)}</div>
+    <div class="name">${esc(viewingEquipment.name)}</div>
+    <div class="meta">${esc(viewingEquipment.manufacturer)} ${esc(viewingEquipment.modelNumber)}<br />S/N ${esc(viewingEquipment.serialNumber)}<br />${esc(viewingEquipment.ward)}</div>
+    <div class="hint">Scan with any phone camera to view service history</div>
+  </div>
+  <script>
+    window.addEventListener('load', function () {
+      window.focus();
+      window.print();
+    });
+  <\/script>
+</body>
+</html>`);
+    win.document.close();
   };
 
   // Filter list
@@ -178,7 +260,7 @@ export default function EquipmentRegistryView() {
             className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 font-mono text-xs font-semibold rounded-xl border border-slate-800 hover:border-teal-500/20 transition flex items-center space-x-2"
           >
             <QrCode className="w-4 h-4 text-teal-400" />
-            <span>Simulate QR Scan</span>
+            <span>Scan QR</span>
           </button>
           
           <button
@@ -192,29 +274,55 @@ export default function EquipmentRegistryView() {
         </div>
       </div>
 
-      {/* Instant Scan Modal Simulation */}
+      {/* Scan panel: camera first, manual entry as a fallback */}
       {scanOpen && (
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl space-y-3">
+        <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase font-mono text-teal-400">QR Scanner Simulation Terminal</span>
-            <button onClick={() => setScanOpen(false)} className="text-xs font-mono text-slate-500 hover:text-white">Close</button>
-          </div>
-          <div className="flex gap-2">
-            <input
-              id="qr-scan-input"
-              type="text"
-              placeholder="Type Device ID or Asset Number (e.g., EQ-0980)"
-              value={scanInputId}
-              onChange={(e) => setScanInputId(e.target.value)}
-              className="flex-1 bg-slate-950 px-3 py-2 text-xs font-mono border border-slate-800 rounded-lg text-white focus:outline-none focus:border-teal-500"
-            />
+            <span className="text-xs font-semibold uppercase font-mono text-teal-400">Device Lookup</span>
             <button
-              onClick={handleSimulateScan}
-              className="bg-teal-500 hover:bg-teal-400 text-slate-950 px-4 py-2 text-xs font-bold rounded-lg transition"
+              onClick={() => { setScanOpen(false); setCameraOpen(false); setScanFeedback(null); }}
+              className="text-xs font-mono text-slate-500 hover:text-white cursor-pointer"
             >
-              Verify Code
+              Close
             </button>
           </div>
+
+          {cameraOpen ? (
+            <QrScanner onDetected={resolveScannedCode} onClose={() => setCameraOpen(false)} />
+          ) : (
+            <button
+              type="button"
+              onClick={() => { setScanFeedback(null); setCameraOpen(true); }}
+              className="w-full sm:w-auto px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold rounded-lg transition flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Camera className="w-4 h-4" />
+              <span>Open camera</span>
+            </button>
+          )}
+
+          <div className="pt-1 space-y-2">
+            <label className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block">
+              Or enter a Device ID / Asset Number
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="qr-scan-input"
+                type="text"
+                placeholder="e.g. EQ-0001"
+                value={scanInputId}
+                onChange={(e) => setScanInputId(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleManualScanLookup(); }}
+                className="flex-1 bg-slate-950 px-3 py-2 text-xs font-mono border border-slate-800 rounded-lg text-white focus:outline-none focus:border-teal-500"
+              />
+              <button
+                onClick={handleManualScanLookup}
+                className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer"
+              >
+                Open
+              </button>
+            </div>
+          </div>
+
           {scanFeedback && (
             <p className="text-[11px] font-mono text-amber-300">{scanFeedback}</p>
           )}
@@ -333,29 +441,6 @@ export default function EquipmentRegistryView() {
                   <option key={wd} value={wd}>{wd}</option>
                 ))}
               </select>
-            </div>
-
-            {/* Dates: Purchase, Installation, Warranty */}
-            <div>
-              <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Installation Date</label>
-              <input
-                id="form-eq-inst-date"
-                type="date"
-                value={installationDate}
-                onChange={(e) => setInstallationDate(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Warranty Expiry Date</label>
-              <input
-                id="form-eq-warranty"
-                type="date"
-                value={warrantyExpiryDate}
-                onChange={(e) => setWarrantyExpiryDate(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none"
-              />
             </div>
 
             {/* Status & Photo representation */}
@@ -546,6 +631,32 @@ export default function EquipmentRegistryView() {
                 )}
               </div>
 
+              {/* Label actions */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handlePrintLabel}
+                  disabled={!qrBlobUrl}
+                  className="flex-1 px-3 py-2 bg-slate-950 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 hover:border-teal-500/30 text-slate-300 hover:text-white text-[11px] font-bold rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Print label</span>
+                </button>
+                {onOpenHistory && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenHistory(viewingEquipment.id)}
+                    className="flex-1 px-3 py-2 bg-teal-500 hover:bg-teal-400 text-slate-950 text-[11px] font-bold rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <History className="w-3.5 h-3.5" />
+                    <span>History</span>
+                  </button>
+                )}
+              </div>
+              <p className="text-[9.5px] font-mono text-slate-500 text-center leading-relaxed -mt-3">
+                Print, then fix the label to the device. Any phone camera opens its history.
+              </p>
+
               {/* Extended fields */}
               <div className="space-y-3 text-xs border-t border-slate-800/80 pt-4">
                 <div className="flex justify-between">
@@ -559,14 +670,6 @@ export default function EquipmentRegistryView() {
                 <div className="flex justify-between">
                   <span className="text-slate-500">Ward Name</span>
                   <span className="text-slate-300">{viewingEquipment.ward}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Install Date</span>
-                  <span className="text-slate-300 font-mono">{viewingEquipment.installationDate}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Warranty Exp</span>
-                  <span className="text-slate-300 font-mono">{viewingEquipment.warrantyExpiryDate}</span>
                 </div>
               </div>
 
@@ -642,6 +745,29 @@ export default function EquipmentRegistryView() {
                 )}
               </div>
 
+              {/* Label actions */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handlePrintLabel}
+                  disabled={!qrBlobUrl}
+                  className="flex-1 px-3 py-2.5 bg-slate-950 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 text-slate-300 text-[11px] font-bold rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Print label</span>
+                </button>
+                {onOpenHistory && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenHistory(viewingEquipment.id)}
+                    className="flex-1 px-3 py-2.5 bg-teal-500 hover:bg-teal-400 text-slate-950 text-[11px] font-bold rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <History className="w-3.5 h-3.5" />
+                    <span>History</span>
+                  </button>
+                )}
+              </div>
+
               {/* Extended fields */}
               <div className="space-y-2.5 text-[11px] border-t border-slate-800/80 pt-4 font-mono">
                 <div className="flex justify-between">
@@ -655,14 +781,6 @@ export default function EquipmentRegistryView() {
                 <div className="flex justify-between">
                   <span className="text-slate-500">Ward Name</span>
                   <span className="text-slate-300">{viewingEquipment.ward}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Install Date</span>
-                  <span className="text-slate-300">{viewingEquipment.installationDate}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Warranty Exp</span>
-                  <span className="text-slate-300">{viewingEquipment.warrantyExpiryDate}</span>
                 </div>
               </div>
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { BOOTSTRAP_ADMIN_EMAIL, INSTITUTION_NAME } from '../constants';
+import { BOOTSTRAP_ADMIN_EMAIL, INSTITUTION_NAME, WARDS } from '../constants';
 import { AppUser, UserRole } from '../types';
 import {
   Shield,
@@ -29,10 +29,9 @@ export default function AdministrationView() {
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
 
-  // Manage clinical Wards in Firestore or local state
-  const [wards, setWards] = useState<string[]>([
-    'Intensive Care Unit (ICU)', 'Emergency Department (ER)', 'Cardiology Ward', 'Pediatric Ward', 'Operating Room (OR)', 'CSSD'
-  ]);
+  // Clinical wards. Additions made here are session-only; the canonical list
+  // lives in src/constants.ts.
+  const [wards, setWards] = useState<string[]>([...WARDS]);
   const [newWard, setNewWard] = useState('');
 
   // Fetch real-time staff users directory from Firestore

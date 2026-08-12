@@ -16,11 +16,21 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-export default function EquipmentHistoryView() {
+interface EquipmentHistoryViewProps {
+  /** Device to open, set by a QR scan or a deep link. */
+  focusEquipmentId?: string | null;
+  onFocusHandled?: () => void;
+}
+
+export default function EquipmentHistoryView({
+  focusEquipmentId,
+  onFocusHandled,
+}: EquipmentHistoryViewProps = {}) {
   const { equipment, jobs } = useApp();
 
   // Selected Equipment filter
   const [selectedId, setSelectedId] = useState<string>('');
+  const [notFoundId, setNotFoundId] = useState<string | null>(null);
 
   // Filters for the logs
   const [maintType, setMaintType] = useState<string>('all');
@@ -35,6 +45,27 @@ export default function EquipmentHistoryView() {
       setSelectedId(equipment[0].id);
     }
   }, [equipment, selectedId]);
+
+  // Honour a scanned label or deep link once the registry has loaded. Matching
+  // on asset number as well means a label reprinted with either identifier works.
+  React.useEffect(() => {
+    if (!focusEquipmentId) return;
+
+    const wanted = focusEquipmentId.trim().toLowerCase();
+    const match = equipment.find(
+      (e) => e.id.toLowerCase() === wanted || e.assetNumber?.toLowerCase() === wanted
+    );
+
+    if (match) {
+      setSelectedId(match.id);
+      setNotFoundId(null);
+      onFocusHandled?.();
+    } else if (equipment.length > 0) {
+      // The registry is loaded and still has no such device.
+      setNotFoundId(focusEquipmentId);
+      onFocusHandled?.();
+    }
+  }, [focusEquipmentId, equipment, onFocusHandled]);
 
   // Derive active equipment details
   const activeDevice = equipment.find(e => e.id === selectedId);
@@ -75,8 +106,27 @@ export default function EquipmentHistoryView() {
         </p>
       </div>
 
+      {/* A scanned label pointed at a device that is not in the registry */}
+      {notFoundId && (
+        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-200 flex items-start gap-2.5 leading-relaxed">
+          <AlertOctagon className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+          <span>
+            No device matching <span className="font-mono font-bold">{notFoundId}</span> is in the
+            registry. The label may belong to equipment that has not been registered yet, or that has
+            since been removed.
+          </span>
+          <button
+            type="button"
+            onClick={() => setNotFoundId(null)}
+            className="ml-auto text-amber-400 hover:text-amber-200 transition shrink-0 cursor-pointer font-mono text-[10px] uppercase"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
+
         {/* Left Side: Select Equipment list selector */}
         <div className="lg:col-span-4 bg-slate-900/30 border border-slate-800 rounded-2xl p-4 space-y-4">
           <div className="flex items-center space-x-2 text-xs font-mono text-teal-400 uppercase tracking-wider font-semibold">

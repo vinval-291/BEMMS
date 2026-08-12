@@ -16,7 +16,7 @@ import ReportsView from './components/ReportsView';
 import AdministrationView from './components/AdministrationView';
 import UserManagementView from './components/UserManagementView';
 import { Activity, Shield, Clock, Download, Smartphone } from 'lucide-react';
-import { INSTITUTION_NAME, INSTITUTION_SHORT_NAME } from './constants';
+import { EQUIPMENT_DEEP_LINK_PARAM, INSTITUTION_NAME, INSTITUTION_SHORT_NAME } from './constants';
 
 /** UTC clock shown in the operational ribbon, ticking once a minute. */
 function useUtcTimestamp() {
@@ -36,7 +36,33 @@ function BiomedicalAppContent() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isStandalone, setIsStandalone] = useState<boolean>(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
+  const [focusEquipmentId, setFocusEquipmentId] = useState<string | null>(null);
   const utcTimestamp = useUtcTimestamp();
+
+  // Open a device's service history, used by QR scans and deep links.
+  const openEquipmentHistory = (equipmentId: string) => {
+    setFocusEquipmentId(equipmentId);
+    setActiveTab('history');
+    setMobileSidebarOpen(false);
+  };
+
+  // A scanned QR label lands here as ?equipment=EQ-0001. This runs on mount even
+  // while the sign-in screen is showing, so the target survives authentication.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get(EQUIPMENT_DEEP_LINK_PARAM);
+    if (!requested) return;
+
+    setFocusEquipmentId(requested);
+    setActiveTab('history');
+
+    // Consume the parameter so a later refresh does not force the user back.
+    params.delete(EQUIPMENT_DEEP_LINK_PARAM);
+    const rest = params.toString();
+    window.history.replaceState({}, '', window.location.pathname + (rest ? `?${rest}` : ''));
+  }, []);
 
   // Monitor standalone display state and register PWA install prompt handler
   useEffect(() => {
@@ -106,11 +132,16 @@ function BiomedicalAppContent() {
       case 'dashboard':
         return <DashboardView />;
       case 'registry':
-        return <EquipmentRegistryView />;
+        return <EquipmentRegistryView onOpenHistory={openEquipmentHistory} />;
       case 'logbook':
         return <WorkDoneBookView />;
       case 'history':
-        return <EquipmentHistoryView />;
+        return (
+          <EquipmentHistoryView
+            focusEquipmentId={focusEquipmentId}
+            onFocusHandled={() => setFocusEquipmentId(null)}
+          />
+        );
       case 'scheduler':
         return <SchedulerView />;
       case 'reports':

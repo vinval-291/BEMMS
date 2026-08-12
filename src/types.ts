@@ -22,10 +22,12 @@ export interface Equipment {
   serialNumber: string;
   assetNumber: string;
   ward: string;
-  installationDate: string;
   purchaseDate: string;
-  warrantyExpiryDate: string;
   status: EquipmentStatus;
+  /** No longer collected. Retained so records created earlier still load. */
+  installationDate?: string;
+  /** No longer collected. Retained so records created earlier still load. */
+  warrantyExpiryDate?: string;
   photoUrl?: string;
   qrCodeData?: string;
   createdAt: string;
