@@ -53,6 +53,7 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
   const [serialNumber, setSerialNumber] = useState('');
   const [assetNumber, setAssetNumber] = useState('');
   const [ward, setWard] = useState(WARDS[0]);
+  const [powerRating, setPowerRating] = useState('');
   // Blank by default and required on submit. Prefilled dates would otherwise be
   // saved verbatim onto assets they do not describe.
   const [purchaseDate, setPurchaseDate] = useState('');
@@ -111,6 +112,7 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
         ward,
         purchaseDate,
         status,
+        powerRating: powerRating.trim(),
         // Left blank when no photo was supplied; the registry renders a
         // placeholder rather than storing an unrelated stock image.
         photoUrl: photoUrl.trim(),
@@ -123,6 +125,7 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
       setSerialNumber('');
       setAssetNumber('');
       setPurchaseDate('');
+      setPowerRating('');
       setPhotoUrl('');
       setShowAddForm(false);
 
@@ -205,7 +208,9 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
     <img src="${qrBlobUrl}" alt="QR code for ${esc(viewingEquipment.id)}" />
     <div class="id">${esc(viewingEquipment.id)}</div>
     <div class="name">${esc(viewingEquipment.name)}</div>
-    <div class="meta">${esc(viewingEquipment.manufacturer)} ${esc(viewingEquipment.modelNumber)}<br />S/N ${esc(viewingEquipment.serialNumber)}<br />${esc(viewingEquipment.ward)}</div>
+    <div class="meta">${esc(viewingEquipment.manufacturer)} ${esc(viewingEquipment.modelNumber)}<br />S/N ${esc(viewingEquipment.serialNumber)}<br />${esc(viewingEquipment.ward)}${
+      viewingEquipment.powerRating ? `<br />${esc(viewingEquipment.powerRating)}` : ''
+    }</div>
     <div class="hint">Scan with any phone camera to view service history</div>
   </div>
   <script>
@@ -417,6 +422,22 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
                   <option key={wd} value={wd}>{wd}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Nameplate electrical rating */}
+            <div>
+              <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Power Rating</label>
+              <input
+                id="form-eq-power"
+                type="text"
+                placeholder="e.g. 230 V / 50 Hz, 1500 W"
+                value={powerRating}
+                onChange={(e) => setPowerRating(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none"
+              />
+              <p className="text-[9.5px] font-mono text-slate-500 mt-1 leading-relaxed">
+                Copy from the device nameplate, exactly as written.
+              </p>
             </div>
 
             {/* Status & Photo representation */}
@@ -631,6 +652,12 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
                   <span className="text-slate-500">Ward Name</span>
                   <span className="text-slate-300">{viewingEquipment.ward}</span>
                 </div>
+                {viewingEquipment.powerRating && (
+                  <div className="flex justify-between gap-3">
+                    <span className="text-slate-500 shrink-0">Power Rating</span>
+                    <span className="text-slate-300 font-mono text-right">{viewingEquipment.powerRating}</span>
+                  </div>
+                )}
               </div>
 
               {/* Admin delete capability */}
@@ -742,6 +769,12 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
                   <span className="text-slate-500">Ward Name</span>
                   <span className="text-slate-300">{viewingEquipment.ward}</span>
                 </div>
+                {viewingEquipment.powerRating && (
+                  <div className="flex justify-between gap-3">
+                    <span className="text-slate-500 shrink-0">Power Rating</span>
+                    <span className="text-slate-300 text-right">{viewingEquipment.powerRating}</span>
+                  </div>
+                )}
               </div>
 
               {/* Admin delete capability */}
