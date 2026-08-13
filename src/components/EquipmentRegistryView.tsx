@@ -97,6 +97,10 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
       alert('Please fill out all required fields to register the equipment.');
       return;
     }
+    if (!powerRating.trim()) {
+      alert('The power rating is required. Copy it from the device nameplate.');
+      return;
+    }
     if (!purchaseDate) {
       alert('The purchase date is required for the asset record.');
       return;
@@ -426,10 +430,11 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
 
             {/* Nameplate electrical rating */}
             <div>
-              <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Power Rating</label>
+              <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Power Rating *</label>
               <input
                 id="form-eq-power"
                 type="text"
+                required
                 placeholder="e.g. 230 V / 50 Hz, 1500 W"
                 value={powerRating}
                 onChange={(e) => setPowerRating(e.target.value)}

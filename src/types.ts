@@ -29,6 +29,9 @@ export interface Equipment {
    * Electrical rating from the device nameplate, recorded as written, e.g.
    * "230 V / 50 Hz, 1500 W" or "120 kVp, 500 mA". Free text because ratings are
    * quoted in W, kW, VA or kVA depending on the device.
+   *
+   * Required when registering a device. Optional on the type because records
+   * created before this field existed do not carry one.
    */
   powerRating?: string;
   /** No longer collected. Retained so records created earlier still load. */
