@@ -26,6 +26,10 @@ export default function SchedulerView() {
 
   const [showAddForm, setShowAddForm] = useState(false);
 
+  // Only Heads of Department and System Administrators assign maintenance.
+  // Engineers see the schedule and complete the work, but do not create it.
+  const canAssign = currentUser?.role === 'admin' || currentUser?.role === 'head';
+
   // Reference dates are derived from the real clock, so overdue and due-soon
   // alerts stay correct as time passes.
   const asIsoDate = (d: Date) => d.toISOString().split('T')[0];
@@ -56,6 +60,11 @@ export default function SchedulerView() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!canAssign) {
+      alert('Only a Head of Department or System Administrator can assign preventive maintenance.');
+      return;
+    }
 
     if (!selectedEquipId) {
       alert('Please select valid target equipment for PM calibration.');
@@ -125,14 +134,16 @@ export default function SchedulerView() {
           </p>
         </div>
 
-        <button
-          id="cmd-schedule-btn"
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="px-4 py-2 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs rounded-xl transition flex items-center space-x-1.5 shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Plan PM Audit</span>
-        </button>
+        {canAssign && (
+          <button
+            id="cmd-schedule-btn"
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="px-4 py-2 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs rounded-xl transition flex items-center space-x-1.5 shrink-0 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Plan PM Audit</span>
+          </button>
+        )}
       </div>
 
       {/* Compliance Alarm Board (Due Today, Due This Week, Overdue Widgets) */}
@@ -198,7 +209,7 @@ export default function SchedulerView() {
       </div>
 
       {/* Plan PM Audit form */}
-      {showAddForm && (
+      {showAddForm && canAssign && (
         <form onSubmit={handleSubmit} className="bg-slate-900/40 border border-slate-800 p-6 rounded-2xl space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Plan Preventive Maintenance</h3>

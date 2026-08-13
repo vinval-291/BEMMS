@@ -130,7 +130,14 @@ service cloud.firestore {
     // ---------------------------------------------------------------------
     match /schedules/{scheduleId} {
       allow read: if isStaff();
-      allow create, update: if isStaff() && isValidId(scheduleId);
+
+      // Only Heads of Department and Administrators assign maintenance.
+      allow create: if isAdminOrHOD() && isValidId(scheduleId);
+
+      // Any active staff member may update one — an engineer marks the work
+      // they carried out as complete.
+      allow update: if isStaff() && isValidId(scheduleId);
+
       allow delete: if isAdminOrHOD();
     }
 
@@ -141,9 +148,10 @@ service cloud.firestore {
       // A notification is private to the staff member it is addressed to.
       allow read: if isStaff() && resource.data.recipientEmail == callerEmail();
 
-      // Any active staff member may notify a colleague, but may not forge the
-      // sender or create a notification that arrives already read.
-      allow create: if isStaff()
+      // Notifications are raised by assignment, which only Heads of Department
+      // and Administrators can perform. They may not create one that arrives
+      // already read.
+      allow create: if isAdminOrHOD()
                     && request.resource.data.recipientEmail is string
                     && request.resource.data.read == false;
 
