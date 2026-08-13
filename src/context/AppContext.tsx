@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, signInWithEmailAndPassword } from 'firebase/auth';
-import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc, getDoc, runTransaction } from 'firebase/firestore';
+import {
+  collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc, getDoc, runTransaction,
+  query, where, addDoc,
+} from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase';
 import {
   BOOTSTRAP_ADMIN_EMAIL,
@@ -8,7 +11,7 @@ import {
   SCHEDULE_ID_PREFIX,
   jobIdPrefix,
 } from '../constants';
-import { AppUser, Equipment, Job, Schedule } from '../types';
+import { AppNotification, AppUser, Equipment, Job, Schedule } from '../types';
 
 /**
  * Finds the next free number in a sequence like EQ-0001, EQ-0002, ...
@@ -66,6 +69,10 @@ interface AppContextType {
   equipment: Equipment[];
   jobs: Job[];
   schedules: Schedule[];
+  /** Registered staff directory, used to assign work to a named engineer. */
+  staff: AppUser[];
+  /** Notifications addressed to the signed-in user, newest first. */
+  notifications: AppNotification[];
   authError: string | null;
   setAuthError: (err: string | null) => void;
   loginWithGoogle: () => Promise<void>;
@@ -79,6 +86,17 @@ interface AppContextType {
   addSchedule: (sch: Omit<Schedule, 'id' | 'createdAt'>) => Promise<string>;
   updateScheduleStatus: (id: string, status: Schedule['status']) => Promise<void>;
   deleteEquipment: (id: string) => Promise<void>;
+  notifyAssignment: (input: AssignmentNotificationInput) => Promise<void>;
+  markNotificationRead: (id: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
+}
+
+export interface AssignmentNotificationInput {
+  recipientEmail: string;
+  equipmentId: string;
+  equipmentName: string;
+  scheduleId: string;
+  dueDate: string;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -89,6 +107,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [staff, setStaff] = useState<AppUser[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Setup Firebase Auth lookup and whitelist enforcement
@@ -211,17 +231,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSchedules([]);
       });
 
+      // Staff directory, used to assign work to a named engineer
+      const unsubStaff = onSnapshot(collection(db, 'users'), (snap) => {
+        const list: AppUser[] = [];
+        snap.forEach((docSnap) => {
+          const data = docSnap.data() as AppUser;
+          list.push({
+            ...data,
+            email: data.email || docSnap.id,
+            name: data.name || data.fullName || docSnap.id,
+          });
+        });
+        setStaff(list);
+      }, (err) => {
+        console.warn('Staff sync error:', err);
+        setStaff([]);
+      });
+
+      // Notifications addressed to this user only. The rules restrict reads to
+      // the recipient, so the query has to filter by the same field.
+      const unsubNotifications = onSnapshot(
+        query(collection(db, 'notifications'), where('recipientEmail', '==', currentUser.email.toLowerCase())),
+        (snap) => {
+          const list: AppNotification[] = [];
+          snap.forEach((docSnap) => {
+            list.push({ ...(docSnap.data() as AppNotification), id: docSnap.id });
+          });
+          list.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+          setNotifications(list);
+        },
+        (err) => {
+          console.warn('Notification sync error:', err);
+          setNotifications([]);
+        }
+      );
+
       setLoading(false);
 
       return () => {
         unsubEquip();
         unsubJobs();
         unsubSchedules();
+        unsubStaff();
+        unsubNotifications();
       };
     } else {
       setEquipment([]);
       setJobs([]);
       setSchedules([]);
+      setStaff([]);
+      setNotifications([]);
     }
   }, [currentUser]);
 
@@ -352,6 +411,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  /**
+   * Records an assignment notification for the engineer who was given the job.
+   *
+   * The in-app notification is the delivery mechanism that works unconditionally.
+   * Email is sent by the optional onNotificationCreated Cloud Function, which
+   * reads these same documents; if it is not deployed the record simply stays
+   * in-app. Failure here must never discard the schedule that was already saved.
+   */
+  const notifyAssignment = async (input: AssignmentNotificationInput) => {
+    if (!currentUser) return;
+
+    const recipient = input.recipientEmail.trim().toLowerCase();
+    if (!recipient || recipient === currentUser.email.toLowerCase()) {
+      // No point notifying yourself about your own assignment.
+      return;
+    }
+
+    const notification: Omit<AppNotification, 'id'> = {
+      recipientEmail: recipient,
+      type: 'assignment',
+      title: 'New maintenance assignment',
+      message:
+        `You have been assigned preventive maintenance on ${input.equipmentName} ` +
+        `(${input.equipmentId}), due ${input.dueDate}.`,
+      equipmentId: input.equipmentId,
+      equipmentName: input.equipmentName,
+      scheduleId: input.scheduleId,
+      dueDate: input.dueDate,
+      createdByName: currentUser.name,
+      read: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    try {
+      await addDoc(collection(db, 'notifications'), notification);
+    } catch (err) {
+      console.error('The schedule was saved, but the engineer could not be notified.', err);
+      throw new Error('The schedule was saved, but the assigned engineer could not be notified.');
+    }
+  };
+
+  const markNotificationRead = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'notifications', id), { read: true });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `notifications/${id}`);
+    }
+  };
+
+  const markAllNotificationsRead = async () => {
+    const unread = notifications.filter((n) => !n.read);
+    await Promise.all(
+      unread.map((n) =>
+        updateDoc(doc(db, 'notifications', n.id), { read: true }).catch((err) =>
+          console.warn(`Could not mark notification ${n.id} as read.`, err)
+        )
+      )
+    );
+  };
+
   const deleteEquipment = async (id: string) => {
     if (currentUser) {
       const pathStr = `equipment/${id}`;
@@ -371,6 +490,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         equipment,
         jobs,
         schedules,
+        staff,
+        notifications,
         authError,
         setAuthError,
         loginWithGoogle,
@@ -381,7 +502,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addJob,
         addSchedule,
         updateScheduleStatus,
-        deleteEquipment
+        deleteEquipment,
+        notifyAssignment,
+        markNotificationRead,
+        markAllNotificationsRead
       }}
     >
       {children}

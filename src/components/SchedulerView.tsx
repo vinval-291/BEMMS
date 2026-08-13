@@ -14,7 +14,15 @@ import {
 } from 'lucide-react';
 
 export default function SchedulerView() {
-  const { equipment, schedules, addSchedule, updateScheduleStatus, currentUser } = useApp();
+  const {
+    equipment, schedules, addSchedule, updateScheduleStatus, currentUser, staff, notifyAssignment,
+  } = useApp();
+
+  // Anyone active in the directory can carry out maintenance, so heads and
+  // admins are selectable alongside engineers. Deactivated staff are excluded.
+  const assignableStaff = staff
+    .filter((s) => s.active !== false && !!s.email)
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const [showAddForm, setShowAddForm] = useState(false);
 
@@ -29,7 +37,8 @@ export default function SchedulerView() {
   const [selectedEquipId, setSelectedEquipId] = useState('');
   const [nextDate, setNextDate] = useState(DEFAULT_NEXT_DATE);
   const [frequency, setFrequency] = useState<ScheduleFrequency>('quarterly');
-  const [assignedEngineerName, setAssignedEngineerName] = useState(currentUser?.name || '');
+  // The engineer is identified by email, which is the staff directory's key.
+  const [assignedEngineerEmail, setAssignedEngineerEmail] = useState(currentUser?.email || '');
 
   // Compute alerts dynamically from active, unfinished schedules
   const activeSchedules = schedules.filter(s => s.status !== 'completed');
@@ -56,6 +65,12 @@ export default function SchedulerView() {
     const linkedEquip = equipment.find(eq => eq.id === selectedEquipId);
     if (!linkedEquip) return;
 
+    const assignee = assignableStaff.find(s => s.email === assignedEngineerEmail);
+    if (!assignee) {
+      alert('Select the engineer this maintenance is assigned to.');
+      return;
+    }
+
     const isOverdue = nextDate < TODAY_STR;
 
     try {
@@ -64,14 +79,29 @@ export default function SchedulerView() {
         equipmentName: linkedEquip.name,
         nextMaintenanceDate: nextDate,
         frequency,
-        assignedEngineerId: assignedEngineerName.toLowerCase().replace(/\s/g, ''),
-        assignedEngineerName,
+        assignedEngineerId: assignee.email,
+        assignedEngineerName: assignee.name,
         status: isOverdue ? 'overdue' : 'pending'
       });
 
       setSelectedEquipId('');
       setShowAddForm(false);
-      alert(`Preventive maintenance sequence ${newSchId} cataloged in the scheduler.`);
+
+      // The schedule is already saved at this point. A notification failure is
+      // reported without pretending the schedule itself did not go through.
+      try {
+        await notifyAssignment({
+          recipientEmail: assignee.email,
+          equipmentId: linkedEquip.id,
+          equipmentName: linkedEquip.name,
+          scheduleId: newSchId,
+          dueDate: nextDate,
+        });
+        const who = assignee.email === currentUser?.email ? 'you' : assignee.name;
+        alert(`Preventive maintenance ${newSchId} cataloged and assigned to ${who}.`);
+      } catch (notifyErr: any) {
+        alert(`Preventive maintenance ${newSchId} was saved, but ${assignee.name} could not be notified: ${notifyErr?.message || notifyErr}`);
+      }
     } catch (err: any) {
       console.error('Schedule creation failed:', err);
       alert(`Could not create this schedule: ${err?.message || err}`);
@@ -232,15 +262,30 @@ export default function SchedulerView() {
 
             {/* Assigned Engineer */}
             <div className="md:col-span-2">
-              <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Assigned Engineer Representative</label>
-              <input
+              <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Assigned Engineer Representative *</label>
+              <select
                 id="form-sch-engineer"
-                type="text"
-                placeholder="Engineer Name"
-                value={assignedEngineerName}
-                onChange={(e) => setAssignedEngineerName(e.target.value)}
+                required
+                value={assignedEngineerEmail}
+                onChange={(e) => setAssignedEngineerEmail(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none"
-              />
+              >
+                <option value="">Select a registered engineer…</option>
+                {assignableStaff.map((s) => (
+                  <option key={s.email} value={s.email}>
+                    {s.name}{s.designation ? ` — ${s.designation}` : ''}{s.email === currentUser?.email ? ' (you)' : ''}
+                  </option>
+                ))}
+              </select>
+              {assignableStaff.length === 0 ? (
+                <p className="text-[9.5px] font-mono text-amber-400/80 mt-1 leading-relaxed">
+                  No active staff in the directory yet. Register staff under User Management first.
+                </p>
+              ) : (
+                <p className="text-[9.5px] font-mono text-slate-500 mt-1 leading-relaxed">
+                  The engineer is notified in the app as soon as the schedule is saved.
+                </p>
+              )}
             </div>
 
           </div>

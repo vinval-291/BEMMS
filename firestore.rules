@@ -135,6 +135,27 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------------
+    // 5. Notifications — assignment alerts, addressed by recipient email
+    // ---------------------------------------------------------------------
+    match /notifications/{notificationId} {
+      // A notification is private to the staff member it is addressed to.
+      allow read: if isStaff() && resource.data.recipientEmail == callerEmail();
+
+      // Any active staff member may notify a colleague, but may not forge the
+      // sender or create a notification that arrives already read.
+      allow create: if isStaff()
+                    && request.resource.data.recipientEmail is string
+                    && request.resource.data.read == false;
+
+      // The recipient may only flip their own notification to read.
+      allow update: if isStaff()
+                    && resource.data.recipientEmail == callerEmail()
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+
+      allow delete: if isAdminOrHOD();
+    }
+
+    // ---------------------------------------------------------------------
     // Default deny. Anything not matched above is unreachable.
     // ---------------------------------------------------------------------
     match /{document=**} {

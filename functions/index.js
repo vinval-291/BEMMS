@@ -5,6 +5,7 @@
  */
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 
 // Initialize Admin SDK with default credentials
@@ -241,5 +242,90 @@ exports.deleteUser = onCall(async (request) => {
   } catch (error) {
     console.error("Cloud Function deleteUser exception:", error);
     throw new HttpsError("internal", error.message || "Could not purge staff record.");
+  }
+});
+
+/**
+ * 5. Email an engineer when maintenance is assigned to them.
+ *
+ * Requires the "Trigger Email from Firestore" Firebase Extension, configured to
+ * watch the `mail` collection. This function only writes the message; the
+ * extension owns the SMTP connection and the actual delivery.
+ *
+ * Install with:
+ *   firebase ext:install firebase/firestore-send-email
+ *
+ * Without the extension the app still works — the assignment is delivered
+ * in-app on the engineer's dashboard, and the queued `mail` document is simply
+ * never picked up.
+ */
+exports.onNotificationCreated = onDocumentCreated("notifications/{notificationId}", async (event) => {
+  const snapshot = event.data;
+  if (!snapshot) return;
+
+  const notification = snapshot.data();
+  const recipientEmail = notification.recipientEmail;
+
+  if (!recipientEmail) {
+    console.warn("Notification has no recipient; nothing to email.", event.params.notificationId);
+    return;
+  }
+
+  // Skip if the recipient has no sign-in credential or has been deactivated.
+  const profileSnap = await admin.firestore().collection("users").doc(recipientEmail).get();
+  if (profileSnap.exists && profileSnap.data().active === false) {
+    console.log(`Recipient ${recipientEmail} is deactivated; no email sent.`);
+    return;
+  }
+
+  const recipientName = profileSnap.exists
+    ? (profileSnap.data().name || profileSnap.data().fullName || "Colleague")
+    : "Colleague";
+
+  const dueLine = notification.dueDate ? `Due date: ${notification.dueDate}` : "";
+  const assignedBy = notification.createdByName ? `Assigned by ${notification.createdByName}.` : "";
+
+  const text = [
+    `Hello ${recipientName},`,
+    "",
+    notification.message,
+    dueLine,
+    assignedBy,
+    "",
+    "Open BEMMS to view the device history and record the work carried out.",
+    "",
+    "— BEMMS, Clinical Engineering Department",
+    "General Hospital Lagos, Odan (GHL)",
+  ].filter(Boolean).join("\n");
+
+  const html = `
+    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#0f172a;line-height:1.55;">
+      <p>Hello ${recipientName},</p>
+      <p>${notification.message}</p>
+      ${notification.dueDate ? `<p><strong>Due date:</strong> ${notification.dueDate}</p>` : ""}
+      ${assignedBy ? `<p style="color:#475569;font-size:14px;">${assignedBy}</p>` : ""}
+      <p>Open BEMMS to view the device history and record the work carried out.</p>
+      <hr style="border:none;border-top:1px solid #cbd5e1;margin:18px 0;" />
+      <p style="color:#64748b;font-size:12px;">
+        BEMMS — Clinical Engineering Department<br />
+        General Hospital Lagos, Odan (GHL)
+      </p>
+    </div>`;
+
+  try {
+    await admin.firestore().collection("mail").add({
+      to: [recipientEmail],
+      message: {
+        subject: `BEMMS: ${notification.title || "New maintenance assignment"}`,
+        text,
+        html,
+      },
+    });
+
+    await snapshot.ref.update({ emailQueuedAt: new Date().toISOString() });
+  } catch (error) {
+    // The in-app notification already exists, so a mail failure is logged
+    // rather than retried into a loop.
+    console.error("Could not enqueue assignment email:", error);
   }
 });

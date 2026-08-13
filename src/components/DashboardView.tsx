@@ -9,12 +9,17 @@ import {
   TrendingUp,
   MapPin,
   Sliders,
-  Award
+  Award,
+  Bell,
+  BellOff,
+  CheckCheck
 } from 'lucide-react';
 
 export default function DashboardView() {
-  const { equipment, jobs, schedules } = useApp();
+  const { equipment, jobs, schedules, notifications, markNotificationRead, markAllNotificationsRead } = useApp();
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  const unreadNotifications = notifications.filter(n => !n.read);
 
   // Dynamic calculations from context
   const totalEquipCount = equipment.length;
@@ -88,6 +93,74 @@ export default function DashboardView() {
         <div className="mt-3 md:mt-0 px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl flex items-center space-x-2 text-xs font-mono text-teal-400">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           <span>SYSTEM CONNECTED • SECURE LOCAL TIME STORAGE</span>
+        </div>
+      </div>
+
+      {/* Assignments addressed to the signed-in engineer */}
+      <div className="bg-slate-900/50 rounded-xl border border-slate-800 overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b border-slate-800">
+          <h3 className="font-semibold text-white text-sm flex items-center gap-2">
+            <span className="relative">
+              <Bell className="w-4 h-4 text-teal-400" />
+              {unreadNotifications.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+              )}
+            </span>
+            <span>My Assignments</span>
+            {unreadNotifications.length > 0 && (
+              <span className="text-[10px] font-mono font-bold bg-rose-500/15 text-rose-400 border border-rose-500/25 px-2 py-0.5 rounded-full">
+                {unreadNotifications.length} NEW
+              </span>
+            )}
+          </h3>
+
+          {unreadNotifications.length > 0 && (
+            <button
+              type="button"
+              onClick={markAllNotificationsRead}
+              className="text-[10px] font-mono uppercase tracking-wider text-slate-400 hover:text-teal-400 transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <CheckCheck className="w-3.5 h-3.5" />
+              Mark all read
+            </button>
+          )}
+        </div>
+
+        <div className="divide-y divide-slate-800/70 max-h-72 overflow-y-auto">
+          {notifications.length === 0 ? (
+            <div className="p-6 text-center text-slate-500 text-xs font-mono flex flex-col items-center gap-2">
+              <BellOff className="w-5 h-5 text-slate-600" />
+              <span>No assignments yet. Maintenance assigned to you appears here.</span>
+            </div>
+          ) : (
+            notifications.slice(0, 12).map((n) => (
+              <div
+                key={n.id}
+                className={`p-4 flex items-start gap-3 transition ${n.read ? 'opacity-60' : 'bg-teal-500/[0.04]'}`}
+              >
+                <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${n.read ? 'bg-slate-700' : 'bg-teal-400'}`} />
+
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-white">{n.title}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">{n.message}</p>
+                  <p className="text-[10px] font-mono text-slate-500 mt-1">
+                    {new Date(n.createdAt).toLocaleString()}
+                    {n.createdByName ? ` • assigned by ${n.createdByName}` : ''}
+                  </p>
+                </div>
+
+                {!n.read && (
+                  <button
+                    type="button"
+                    onClick={() => markNotificationRead(n.id)}
+                    className="text-[10px] font-mono uppercase text-slate-500 hover:text-teal-400 transition shrink-0 cursor-pointer"
+                  >
+                    Mark read
+                  </button>
+                )}
+              </div>
+            ))
+          )}
         </div>
       </div>
 

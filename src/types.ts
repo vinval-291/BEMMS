@@ -98,6 +98,27 @@ export interface Schedule {
   createdAt: string;
 }
 
+export type NotificationType = 'assignment';
+
+export interface AppNotification {
+  id: string;
+  /** Lowercased email of the staff member this is addressed to. */
+  recipientEmail: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  equipmentId?: string;
+  equipmentName?: string;
+  scheduleId?: string;
+  dueDate?: string;
+  /** Name of the staff member who created the assignment. */
+  createdByName?: string;
+  read: boolean;
+  createdAt: string;
+  /** Set once an email has been enqueued for this notification. */
+  emailQueuedAt?: string;
+}
+
 export type UserRole = 'engineer' | 'head' | 'admin';
 
 export interface AppUser {
