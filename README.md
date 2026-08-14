@@ -61,12 +61,27 @@ database that has not been provisioned makes every read and write fail with `NOT
    and **Google**.
 3. **Authorize your domains.** Authentication → Settings → Authorized domains. `localhost`
    is authorized by default; add your production hostname before deploying.
-4. **Deploy the security rules.** The rules in this repo are what allow the first admin
-   sign-in to succeed:
+4. **Install the Firebase CLI.** It ships in the `firebase-tools` package, not `firebase` —
+   `npx firebase` fails with "could not determine executable to run" because it resolves the
+   `firebase` web SDK in `node_modules`, which has no executable.
 
    ```bash
-   npx firebase deploy --only firestore:rules
+   npm install -g firebase-tools
    ```
+
+   ```bash
+   firebase login
+   ```
+
+5. **Deploy the security rules.** The rules in this repo are what allow the first admin
+   sign-in to succeed, and what enforce every role boundary. Redeploy them whenever
+   `firestore.rules` changes:
+
+   ```bash
+   firebase deploy --only firestore:rules
+   ```
+
+   They can also be pasted into Firebase Console → Firestore Database → Rules → Publish.
 
 ## First sign-in and roles
 
@@ -111,7 +126,7 @@ cd functions && npm install && cd ..
 ```
 
 ```bash
-npx firebase deploy --only functions
+firebase deploy --only functions
 ```
 
 ## Data model
