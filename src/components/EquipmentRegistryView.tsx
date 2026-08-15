@@ -445,6 +445,19 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
               </p>
             </div>
 
+            {/* Purchase date */}
+            <div>
+              <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Purchase Date *</label>
+              <input
+                id="form-eq-purchase-date"
+                type="date"
+                required
+                value={purchaseDate}
+                onChange={(e) => setPurchaseDate(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none"
+              />
+            </div>
+
             {/* Status & Photo representation */}
             <div>
               <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Initial Status</label>
