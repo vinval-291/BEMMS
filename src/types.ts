@@ -23,8 +23,9 @@ export interface Equipment {
   serialNumber: string;
   assetNumber: string;
   ward: string;
-  purchaseDate: string;
   status: EquipmentStatus;
+  /** No longer collected. Retained so records created earlier still load. */
+  purchaseDate?: string;
   /**
    * Electrical rating from the device nameplate, recorded as written, e.g.
    * "230 V / 50 Hz, 1500 W" or "120 kVp, 500 mA". Free text because ratings are

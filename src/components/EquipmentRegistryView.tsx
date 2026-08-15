@@ -54,9 +54,6 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
   const [assetNumber, setAssetNumber] = useState('');
   const [ward, setWard] = useState(WARDS[0]);
   const [powerRating, setPowerRating] = useState('');
-  // Blank by default and required on submit. Prefilled dates would otherwise be
-  // saved verbatim onto assets they do not describe.
-  const [purchaseDate, setPurchaseDate] = useState('');
   const [status, setStatus] = useState<EquipmentStatus>('Active');
   const [photoUrl, setPhotoUrl] = useState('');
 
@@ -101,10 +98,6 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
       alert('The power rating is required. Copy it from the device nameplate.');
       return;
     }
-    if (!purchaseDate) {
-      alert('The purchase date is required for the asset record.');
-      return;
-    }
 
     try {
       const newId = await addEquipment({
@@ -114,7 +107,6 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
         serialNumber,
         assetNumber,
         ward,
-        purchaseDate,
         status,
         powerRating: powerRating.trim(),
         // Left blank when no photo was supplied; the registry renders a
@@ -128,7 +120,6 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
       setModelNumber('');
       setSerialNumber('');
       setAssetNumber('');
-      setPurchaseDate('');
       setPowerRating('');
       setPhotoUrl('');
       setShowAddForm(false);
@@ -443,19 +434,6 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
               <p className="text-[9.5px] font-mono text-slate-500 mt-1 leading-relaxed">
                 Copy from the device nameplate, exactly as written.
               </p>
-            </div>
-
-            {/* Purchase date */}
-            <div>
-              <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Purchase Date *</label>
-              <input
-                id="form-eq-purchase-date"
-                type="date"
-                required
-                value={purchaseDate}
-                onChange={(e) => setPurchaseDate(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none"
-              />
             </div>
 
             {/* Status & Photo representation */}
