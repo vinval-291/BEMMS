@@ -99,7 +99,7 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !manufacturer || !modelNumber || !serialNumber || !assetNumber) {
+    if (!name || !manufacturer || !modelNumber || !serialNumber) {
       alert('Please fill out all required fields to register the equipment.');
       return;
     }
@@ -169,7 +169,6 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
       ['manufacturer', 'Manufacturer'],
       ['modelNumber', 'Model number'],
       ['serialNumber', 'Serial number'],
-      ['assetNumber', 'Hospital asset code'],
       ['powerRating', 'Power rating'],
     ];
 
@@ -187,7 +186,7 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
         manufacturer: editForm.manufacturer.trim(),
         modelNumber: editForm.modelNumber.trim(),
         serialNumber: editForm.serialNumber.trim(),
-        assetNumber: editForm.assetNumber.trim(),
+        assetNumber: (editForm.assetNumber || '').trim(),
         ward: editForm.ward,
         status: editForm.status,
         powerRating: (editForm.powerRating || '').trim(),
@@ -219,7 +218,7 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
     if (!wanted) return;
 
     const target = equipment.find(
-      e => e.id.toLowerCase() === wanted || e.assetNumber.toLowerCase() === wanted
+      e => e.id.toLowerCase() === wanted || e.assetNumber?.toLowerCase() === wanted
     );
 
     if (!target) {
@@ -303,7 +302,7 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
       eq.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       eq.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       eq.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      eq.assetNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (eq.assetNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       eq.ward.toLowerCase().includes(searchTerm.toLowerCase());
     
     const statusMatch = statusFilter === 'all' || eq.status === statusFilter;
@@ -470,11 +469,10 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
             </div>
 
             <div>
-              <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Hospital Asset Code *</label>
+              <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Hospital Asset Code (Optional)</label>
               <input
                 id="form-eq-asset"
                 type="text"
-                required
                 placeholder="e.g. HOSP-MON-942"
                 value={assetNumber}
                 onChange={(e) => setAssetNumber(e.target.value)}
@@ -631,7 +629,7 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
                   <div className="grid grid-cols-2 gap-2 text-[10px] font-mono border-t border-slate-800/60 pt-3 text-slate-400">
                     <div>
                       <span className="block text-slate-500">ASSET CODE</span>
-                      <span className="text-white truncate block mt-0.5">{eq.assetNumber}</span>
+                      <span className="text-white truncate block mt-0.5">{eq.assetNumber || '—'}</span>
                     </div>
                     <div>
                       <span className="block text-slate-500">LOCATION</span>
@@ -730,7 +728,7 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Asset No.</span>
-                  <span className="text-slate-300 font-mono">{viewingEquipment.assetNumber}</span>
+                  <span className="text-slate-300 font-mono">{viewingEquipment.assetNumber || '—'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Ward Name</span>
@@ -849,11 +847,10 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
               </div>
 
               <div>
-                <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Hospital Asset Code *</label>
+                <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Hospital Asset Code (Optional)</label>
                 <input
                   type="text"
-                  required
-                  value={editForm.assetNumber}
+                  value={editForm.assetNumber || ''}
                   onChange={(e) => setEditForm({ ...editForm, assetNumber: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none"
                 />
@@ -1026,7 +1023,7 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Asset No.</span>
-                  <span className="text-slate-300 font-bold">{viewingEquipment.assetNumber}</span>
+                  <span className="text-slate-300 font-bold">{viewingEquipment.assetNumber || '—'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Ward Name</span>

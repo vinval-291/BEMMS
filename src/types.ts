@@ -21,7 +21,8 @@ export interface Equipment {
   manufacturer: string;
   modelNumber: string;
   serialNumber: string;
-  assetNumber: string;
+  /** Optional. Not every device carries a hospital asset code. */
+  assetNumber?: string;
   ward: string;
   status: EquipmentStatus;
   /** No longer collected. Retained so records created earlier still load. */
