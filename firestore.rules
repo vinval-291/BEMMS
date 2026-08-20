@@ -109,7 +109,18 @@ service cloud.firestore {
     // ---------------------------------------------------------------------
     match /equipment/{equipmentId} {
       allow read: if isStaff();
-      allow create, update: if isStaff() && isValidId(equipmentId);
+      allow create: if isStaff() && isValidId(equipmentId);
+
+      // Amending a device's details — name, manufacturer, serial, ward and so
+      // on — is restricted to System Administrators.
+      allow update: if isAdmin() && isValidId(equipmentId);
+
+      // Any active staff member may still move a device's status, which is what
+      // filing a Work Done Book entry does. Nothing else may change on that path.
+      allow update: if isStaff()
+                    && isValidId(equipmentId)
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+
       allow delete: if isAdminOrHOD();
     }
 

@@ -42,6 +42,10 @@ export interface Equipment {
   photoUrl?: string;
   qrCodeData?: string;
   createdAt: string;
+  /** Set when an administrator last amended the record. */
+  updatedAt?: string;
+  /** Email of the administrator who last amended the record. */
+  updatedBy?: string;
 }
 
 export type MaintenanceType =

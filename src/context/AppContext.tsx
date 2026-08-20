@@ -82,6 +82,8 @@ interface AppContextType {
   // Data actions. The add* methods allocate the record ID and return it.
   addEquipment: (eq: Omit<Equipment, 'id' | 'createdAt'>) => Promise<string>;
   updateEquipmentStatus: (id: string, status: Equipment['status']) => Promise<void>;
+  /** Amends a registered device. Administrators only, enforced by the rules. */
+  updateEquipment: (id: string, changes: EquipmentEdit) => Promise<void>;
   addJob: (job: Omit<Job, 'id' | 'createdAt'>) => Promise<string>;
   addSchedule: (sch: Omit<Schedule, 'id' | 'createdAt'>) => Promise<string>;
   updateScheduleStatus: (id: string, status: Schedule['status']) => Promise<void>;
@@ -90,6 +92,15 @@ interface AppContextType {
   markNotificationRead: (id: string) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
 }
+
+/** The fields of a registered device an administrator may amend. */
+export type EquipmentEdit = Pick<
+  Equipment,
+  'name' | 'manufacturer' | 'modelNumber' | 'serialNumber' | 'assetNumber' | 'ward' | 'status'
+> & {
+  powerRating?: string;
+  photoUrl?: string;
+};
 
 export interface AssignmentNotificationInput {
   recipientEmail: string;
@@ -339,6 +350,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateEquipment = async (id: string, changes: EquipmentEdit) => {
+    if (currentUser?.role !== 'admin') {
+      throw new Error('Only a System Administrator can amend a registered device.');
+    }
+
+    const pathStr = `equipment/${id}`;
+    try {
+      await updateDoc(doc(db, 'equipment', id), {
+        ...changes,
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUser.email,
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, pathStr);
+    }
+  };
+
   const updateEquipmentStatus = async (id: string, status: Equipment['status']) => {
     if (currentUser) {
       const pathStr = `equipment/${id}`;
@@ -498,6 +526,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loginWithEmail,
         logout,
         addEquipment,
+        updateEquipment,
         updateEquipmentStatus,
         addJob,
         addSchedule,

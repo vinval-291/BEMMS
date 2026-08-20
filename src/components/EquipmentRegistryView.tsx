@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp, type EquipmentEdit } from '../context/AppContext';
 import { Equipment, EquipmentStatus } from '../types';
 import {
   INSTITUTION_NAME,
@@ -25,7 +25,8 @@ import {
   Camera,
   Layers3,
   Printer,
-  History
+  History,
+  Pencil
 } from 'lucide-react';
 import QRCode from 'qrcode';
 
@@ -35,7 +36,10 @@ interface EquipmentRegistryViewProps {
 }
 
 export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegistryViewProps = {}) {
-  const { equipment, addEquipment, deleteEquipment, currentUser } = useApp();
+  const { equipment, addEquipment, updateEquipment, deleteEquipment, currentUser } = useApp();
+
+  // Amending a registered device is a System Administrator action.
+  const canEdit = currentUser?.role === 'admin';
   
   // Filtering & Search
   const [searchTerm, setSearchTerm] = useState('');
@@ -56,6 +60,11 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
   const [powerRating, setPowerRating] = useState('');
   const [status, setStatus] = useState<EquipmentStatus>('Active');
   const [photoUrl, setPhotoUrl] = useState('');
+
+  // Edit state. The device being amended, plus a working copy of its fields.
+  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
+  const [editForm, setEditForm] = useState<EquipmentEdit | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // Scan state
   const [scanInputId, setScanInputId] = useState('');
@@ -128,6 +137,75 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
     } catch (err: any) {
       console.error('Equipment registration failed:', err);
       alert(`Could not register this device: ${err?.message || err}`);
+    }
+  };
+
+  const openEditor = (device: Equipment) => {
+    setEditingEquipment(device);
+    setEditForm({
+      name: device.name,
+      manufacturer: device.manufacturer,
+      modelNumber: device.modelNumber,
+      serialNumber: device.serialNumber,
+      assetNumber: device.assetNumber,
+      ward: device.ward,
+      status: device.status,
+      powerRating: device.powerRating || '',
+      photoUrl: device.photoUrl || '',
+    });
+  };
+
+  const closeEditor = () => {
+    setEditingEquipment(null);
+    setEditForm(null);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEquipment || !editForm) return;
+
+    const required: [keyof EquipmentEdit, string][] = [
+      ['name', 'Equipment name'],
+      ['manufacturer', 'Manufacturer'],
+      ['modelNumber', 'Model number'],
+      ['serialNumber', 'Serial number'],
+      ['assetNumber', 'Hospital asset code'],
+      ['powerRating', 'Power rating'],
+    ];
+
+    for (const [field, label] of required) {
+      if (!String(editForm[field] ?? '').trim()) {
+        alert(`${label} cannot be left blank.`);
+        return;
+      }
+    }
+
+    setSavingEdit(true);
+    try {
+      await updateEquipment(editingEquipment.id, {
+        name: editForm.name.trim(),
+        manufacturer: editForm.manufacturer.trim(),
+        modelNumber: editForm.modelNumber.trim(),
+        serialNumber: editForm.serialNumber.trim(),
+        assetNumber: editForm.assetNumber.trim(),
+        ward: editForm.ward,
+        status: editForm.status,
+        powerRating: (editForm.powerRating || '').trim(),
+        photoUrl: (editForm.photoUrl || '').trim(),
+      });
+
+      // Keep the detail panel in step with what was just saved.
+      setViewingEquipment(prev =>
+        prev && prev.id === editingEquipment.id ? { ...prev, ...editForm } : prev
+      );
+
+      closeEditor();
+      alert(`${editingEquipment.id} updated.`);
+    } catch (err: any) {
+      console.error('Equipment update failed:', err);
+      alert(`Could not save these changes: ${err?.message || err}`);
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -630,6 +708,16 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
                   </button>
                 )}
               </div>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => openEditor(viewingEquipment)}
+                  className="w-full px-3 py-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/30 text-slate-300 hover:text-white text-[11px] font-bold rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer -mt-1"
+                >
+                  <Pencil className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Edit details</span>
+                </button>
+              )}
               <p className="text-[9.5px] font-mono text-slate-500 text-center leading-relaxed -mt-3">
                 Print, then fix the label to the device. Any phone camera opens its history.
               </p>
@@ -683,6 +771,175 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
         </div>
 
       </div>
+
+      {/* Administrator edit dialog */}
+      {editingEquipment && editForm && canEdit && (
+        <div className="fixed inset-0 z-[60] bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <form
+            onSubmit={handleSaveEdit}
+            className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl p-6 space-y-5 my-auto max-h-[92vh] overflow-y-auto"
+          >
+            <div className="flex items-start justify-between border-b border-slate-800 pb-3 gap-4">
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-white uppercase tracking-wider flex items-center gap-2">
+                  <Pencil className="w-4 h-4 text-amber-400" />
+                  Amend device record
+                </h3>
+                <p className="text-[10px] font-mono text-slate-500 mt-1">
+                  {editingEquipment.id} • registered {new Date(editingEquipment.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeEditor}
+                className="text-xs font-mono text-slate-400 hover:text-white transition shrink-0 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <p className="text-[10.5px] font-mono text-amber-300/80 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 leading-relaxed">
+              The device ID and its service history are not affected. Correcting a serial or asset
+              code here changes what future records are checked against.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Equipment Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Manufacturer *</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.manufacturer}
+                  onChange={(e) => setEditForm({ ...editForm, manufacturer: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Model Number *</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.modelNumber}
+                  onChange={(e) => setEditForm({ ...editForm, modelNumber: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Serial Number *</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.serialNumber}
+                  onChange={(e) => setEditForm({ ...editForm, serialNumber: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Hospital Asset Code *</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.assetNumber}
+                  onChange={(e) => setEditForm({ ...editForm, assetNumber: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Ward / Department *</label>
+                <select
+                  required
+                  value={editForm.ward}
+                  onChange={(e) => setEditForm({ ...editForm, ward: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none"
+                >
+                  {/* A ward recorded before this list existed stays selectable */}
+                  {!WARDS.includes(editForm.ward) && (
+                    <option value={editForm.ward}>{editForm.ward} (not in current list)</option>
+                  )}
+                  {WARDS.map((wd) => (
+                    <option key={wd} value={wd}>{wd}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Power Rating *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 230 V / 50 Hz, 1500 W"
+                  value={editForm.powerRating || ''}
+                  onChange={(e) => setEditForm({ ...editForm, powerRating: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Status</label>
+                <select
+                  value={editForm.status}
+                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value as EquipmentStatus })}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none"
+                >
+                  {statuses.map((st) => (
+                    <option key={st} value={st}>{st}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Device Image URL (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="Optional — link to a photograph of this device"
+                  value={editForm.photoUrl || ''}
+                  onChange={(e) => setEditForm({ ...editForm, photoUrl: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {editingEquipment.updatedAt && (
+              <p className="text-[10px] font-mono text-slate-500">
+                Last amended {new Date(editingEquipment.updatedAt).toLocaleString()}
+                {editingEquipment.updatedBy ? ` by ${editingEquipment.updatedBy}` : ''}
+              </p>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={closeEditor}
+                className="flex-1 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                Discard
+              </button>
+              <button
+                type="submit"
+                disabled={savingEdit}
+                className="flex-1 py-2.5 bg-teal-500 hover:bg-teal-400 disabled:opacity-50 text-slate-950 text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                {savingEdit ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Selected device details inspect drawer for Mobile */}
       {viewingEquipment && (
@@ -750,6 +1007,16 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
                   </button>
                 )}
               </div>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => openEditor(viewingEquipment)}
+                  className="w-full px-3 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-[11px] font-bold rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Pencil className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Edit details</span>
+                </button>
+              )}
 
               {/* Extended fields */}
               <div className="space-y-2.5 text-[11px] border-t border-slate-800/80 pt-4 font-mono">
