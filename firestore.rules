@@ -38,18 +38,20 @@ service cloud.firestore {
     }
 
     // A caller is active if they are the bootstrap admin, or their profile
-    // exists and has not been deactivated. exists() is checked before get()
-    // so a missing profile denies cleanly instead of raising an error.
+    // exists and has not been deactivated. exists() is checked before get() so
+    // a missing profile denies cleanly, and get(field, default) is used because
+    // reading an absent field raises an error and would deny a valid caller —
+    // profiles written before `active` existed simply count as active.
     function isActive() {
       return isBootstrapAdmin() ||
-             (signedIn() && callerExists() && callerData().active != false);
+             (signedIn() && callerExists() && callerData().get('active', true) != false);
     }
 
     // The bootstrap admin always holds the admin role, even before their
     // profile document has been written.
     function hasRole(role) {
       return (isBootstrapAdmin() && role == 'admin') ||
-             (signedIn() && callerExists() && callerData().role == role);
+             (signedIn() && callerExists() && callerData().get('role', 'none') == role);
     }
 
     function isAdmin() {
@@ -83,11 +85,12 @@ service cloud.firestore {
       // Admins and HODs manage the staff directory. An HOD may not create or
       // promote anyone to admin, nor modify an existing admin's record.
       allow create: if isAdminOrHOD()
-                    && (isAdmin() || request.resource.data.role != 'admin');
+                    && (isAdmin() || request.resource.data.get('role', 'engineer') != 'admin');
 
       allow update: if isAdminOrHOD()
                     && (isAdmin()
-                        || (resource.data.role != 'admin' && request.resource.data.role != 'admin'));
+                        || (resource.data.get('role', 'engineer') != 'admin'
+                            && request.resource.data.get('role', 'engineer') != 'admin'));
 
       // Staff may maintain their own profile, but may not change their own
       // role or reactivate themselves. diff() avoids touching fields that may
@@ -101,7 +104,7 @@ service cloud.firestore {
       // system out of itself.
       allow delete: if isAdminOrHOD()
                     && email.lower() != callerEmail()
-                    && (isAdmin() || resource.data.role != 'admin');
+                    && (isAdmin() || resource.data.get('role', 'engineer') != 'admin');
     }
 
     // ---------------------------------------------------------------------
@@ -164,7 +167,7 @@ service cloud.firestore {
       // already read.
       allow create: if isAdminOrHOD()
                     && request.resource.data.recipientEmail is string
-                    && request.resource.data.read == false;
+                    && request.resource.data.get('read', true) == false;
 
       // The recipient may only flip their own notification to read.
       allow update: if isStaff()
