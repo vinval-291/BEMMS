@@ -321,7 +321,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.error('Email login failed:', err);
       let errMsg = err.message || 'Authentication with Email & Password failed.';
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
-        errMsg = 'Invalid email address or password. Please verify and try again.';
+        // A password can also be absent because Firebase removed it when the
+        // account first signed in with Google on an unverified address, so the
+        // message points at both remedies rather than only "wrong password".
+        errMsg =
+          'Invalid email address or password. If you have signed in with Google before, use "Forgot password" to set a password for this account.';
       }
       setAuthError(errMsg);
       throw new Error(errMsg);

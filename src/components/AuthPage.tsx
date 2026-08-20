@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../firebase';
 import { INSTITUTION_NAME } from '../constants';
-import { Shield, AlertCircle } from 'lucide-react';
+import { Shield, AlertCircle, MailCheck } from 'lucide-react';
 
 export default function AuthPage() {
   const { loginWithGoogle, loginWithEmail, authError, setAuthError } = useApp();
@@ -9,11 +11,13 @@ export default function AuthPage() {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     setAuthError(null);
+    setNotice(null);
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
@@ -40,6 +44,39 @@ export default function AuthPage() {
     } catch (err: any) {
       console.error(err);
       setFormError(err.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Sends a reset link. Completing a reset also marks the address verified,
+   * which is what restores password sign-in for anyone whose password Firebase
+   * removed when they first signed in with Google.
+   */
+  const handleForgotPassword = async () => {
+    setFormError(null);
+    setAuthError(null);
+    setNotice(null);
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setFormError('Enter your hospital email address first, then choose "Forgot password".');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, trimmedEmail.toLowerCase());
+      setNotice(
+        `If ${trimmedEmail.toLowerCase()} is registered, a password reset link is on its way. Opening it also confirms your address, so you can use both the password and Google sign-in afterwards.`
+      );
+    } catch (err: any) {
+      console.error('Password reset request failed:', err);
+      // Do not disclose whether the address exists.
+      setNotice(
+        `If ${trimmedEmail.toLowerCase()} is registered, a password reset link is on its way.`
+      );
     } finally {
       setLoading(false);
     }
@@ -87,6 +124,14 @@ export default function AuthPage() {
           </div>
         )}
 
+        {/* Reset-link confirmation */}
+        {notice && (
+          <div className="mb-5 p-4 rounded-xl bg-teal-500/10 border border-teal-500/20 text-xs text-teal-100 flex items-start space-x-2.5">
+            <MailCheck className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" />
+            <span className="leading-relaxed">{notice}</span>
+          </div>
+        )}
+
         {/* Credentials Email/Password Form */}
         <form onSubmit={handleEmailLogin} className="space-y-4 mb-5">
           <div className="space-y-1.5">
@@ -102,7 +147,17 @@ export default function AuthPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] uppercase font-mono text-slate-400 font-bold block">Password</label>
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] uppercase font-mono text-slate-400 font-bold block">Password</label>
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={loading}
+                className="text-[10px] font-mono text-teal-400 hover:text-teal-300 hover:underline transition disabled:opacity-50 cursor-pointer"
+              >
+                Forgot password?
+              </button>
+            </div>
             <input
               type="password"
               disabled={loading}

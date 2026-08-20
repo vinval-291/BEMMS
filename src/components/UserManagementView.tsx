@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, signOut as secondarySignOut, sendPasswordResetEmail } from 'firebase/auth';
+import {
+  getAuth, createUserWithEmailAndPassword, signOut as secondarySignOut,
+  sendPasswordResetEmail, sendEmailVerification,
+} from 'firebase/auth';
 import { auth, db } from '../firebase';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { AppUser, UserRole } from '../types';
@@ -152,10 +155,24 @@ export default function UserManagementView() {
 
       // 2. Provision in Firebase Auth via sandbox secondary app
       let targetUid = '';
+      let verificationSent = false;
       try {
         const secAuth = getSecondaryAuth();
         const credentials = await createUserWithEmailAndPassword(secAuth, targetEmail, password);
         targetUid = credentials.user.uid;
+
+        // A new credential starts with an unverified address. If the staff
+        // member signs in with Google before verifying, Firebase treats the
+        // unverified password as untrustworthy and removes it, leaving Google
+        // as their only way in. Verifying the address first makes Firebase link
+        // the two providers instead, so both sign-in methods keep working.
+        try {
+          await sendEmailVerification(credentials.user);
+          verificationSent = true;
+        } catch (verifyErr) {
+          console.warn('Could not send the verification email:', verifyErr);
+        }
+
         await secondarySignOut(secAuth);
       } catch (authErr: any) {
         console.warn('Secondary-app credential provisioning failed:', authErr);
@@ -188,7 +205,11 @@ export default function UserManagementView() {
 
       await setDoc(userDocRef, newStaffRecord);
 
-      setActionSuccess(`BEMMS Access successfully authorized and configured for ${fullName} (${targetEmail})`);
+      setActionSuccess(
+        verificationSent
+          ? `BEMMS access authorized for ${fullName} (${targetEmail}). A verification email has been sent — they should open it before using Google sign-in, otherwise Firebase will drop their password and leave Google as their only way in.`
+          : `BEMMS access authorized for ${fullName} (${targetEmail}). The verification email could not be sent; use "Reset password" on their row so they can verify the address, or they may lose password sign-in once they use Google.`
+      );
       setShowCreateModal(false);
       resetCreateForm();
     } catch (err: any) {
