@@ -69,6 +69,10 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
   const quantityNum = Math.floor(Number(quantity)) || 1;
   const isBulk = quantityNum > 1;
 
+  // IDs from the most recent bulk registration, so their labels can be printed
+  // as a sheet without hunting for them in the registry.
+  const [lastBatchIds, setLastBatchIds] = useState<string[]>([]);
+
   // Edit state. The device being amended, plus a working copy of its fields.
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [editForm, setEditForm] = useState<EquipmentEdit | null>(null);
@@ -164,7 +168,10 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
       const result = await addEquipmentBatch(details, quantityNum);
       const { created, failedAt, error } = result;
 
-      if (created.length > 0) resetForm();
+      if (created.length > 0) {
+        resetForm();
+        setLastBatchIds(created);
+      }
 
       if (failedAt) {
         alert(
@@ -177,7 +184,7 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
 
       alert(
         `Registered ${created.length} units: ${created[0]} to ${created[created.length - 1]}.\n\n` +
-        `Each has its own QR label — print them from the registry and attach one to each unit.`
+        `Use "Print ${created.length} labels" at the top of the registry to print the whole batch as one sheet.`
       );
     } catch (err: any) {
       console.error('Equipment registration failed:', err);
@@ -289,27 +296,80 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
   const handleManualScanLookup = () => resolveScannedCode(scanInputId);
 
   /** Opens a print dialog containing just the QR label for the shown device. */
-  const handlePrintLabel = () => {
-    if (!viewingEquipment || !qrBlobUrl) return;
+  /**
+   * Opens a print sheet of QR labels — one device or a whole batch, laid out as
+   * a grid to be cut apart and attached to each unit.
+   */
+  const printLabelSheet = async (devices: Equipment[]) => {
+    if (devices.length === 0) return;
 
-    const win = window.open('', '_blank', 'width=460,height=640');
+    // Opened before the await so the click is still the trigger; browsers block
+    // windows opened after an async gap.
+    const win = window.open('', '_blank', 'width=900,height=700');
     if (!win) {
       alert('The print window was blocked. Allow pop-ups for this site and try again.');
       return;
     }
 
-    const esc = (s: string) =>
-      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    win.document.write(
+      '<!doctype html><meta charset="utf-8" /><title>Preparing labels…</title>' +
+      '<body style="font-family:system-ui,sans-serif;padding:24px;color:#334155">' +
+      `Generating ${devices.length} label${devices.length === 1 ? '' : 's'}…</body>`
+    );
 
+    const esc = (s: string) =>
+      String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    let labels: { device: Equipment; qr: string }[];
+    try {
+      labels = await Promise.all(
+        devices.map(async (device) => ({
+          device,
+          qr: await QRCode.toDataURL(equipmentDeepLink(device.id), {
+            width: 320,
+            margin: 1,
+            errorCorrectionLevel: 'M',
+            color: { dark: '#0f172a', light: '#ffffff' },
+          }),
+        }))
+      );
+    } catch (err) {
+      console.error('Could not generate the label sheet:', err);
+      win.close();
+      alert('The QR labels could not be generated. Please try again.');
+      return;
+    }
+
+    const title = devices.length === 1
+      ? `${devices[0].id} — ${devices[0].name}`
+      : `BEMMS labels (${devices.length})`;
+
+    const body = labels.map(({ device, qr }) => `
+      <div class="label">
+        <div class="brand">BEMMS</div>
+        <div class="inst">${esc(INSTITUTION_NAME)}</div>
+        <img src="${qr}" alt="QR code for ${esc(device.id)}" />
+        <div class="id">${esc(device.id)}</div>
+        <div class="name">${esc(device.name)}</div>
+        <div class="meta">${esc(device.manufacturer)} ${esc(device.modelNumber)}${
+          device.serialNumber ? `<br />S/N ${esc(device.serialNumber)}` : ''
+        }<br />${esc(device.ward)}${
+          device.powerRating ? `<br />${esc(device.powerRating)}` : ''
+        }</div>
+        <div class="hint">Scan with any phone camera to view service history</div>
+      </div>`).join('');
+
+    win.document.open();
     win.document.write(`<!doctype html>
 <html>
 <head>
 <meta charset="utf-8" />
-<title>${esc(viewingEquipment.id)} — ${esc(viewingEquipment.name)}</title>
+<title>${esc(title)}</title>
 <style>
   * { box-sizing: border-box; }
-  body { margin: 0; padding: 16px; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #0f172a; }
-  .label { width: 62mm; border: 1.5px solid #0f172a; border-radius: 6px; padding: 8px 8px 10px; text-align: center; page-break-inside: avoid; }
+  body { margin: 0; padding: 8mm; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #0f172a; }
+  .sheet { display: flex; flex-wrap: wrap; gap: 4mm; align-content: flex-start; }
+  .label { width: 62mm; border: 1.5px solid #0f172a; border-radius: 6px; padding: 8px 8px 10px; text-align: center; page-break-inside: avoid; break-inside: avoid; }
   .brand { font-size: 8px; letter-spacing: 1.6px; text-transform: uppercase; font-weight: 700; color: #0f766e; }
   .inst { font-size: 6.5px; letter-spacing: .6px; text-transform: uppercase; color: #475569; margin-top: 1px; }
   img { width: 42mm; height: 42mm; display: block; margin: 6px auto 4px; }
@@ -317,30 +377,39 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
   .name { font-size: 9px; font-weight: 600; margin-top: 2px; line-height: 1.25; }
   .meta { font-size: 7px; color: #475569; margin-top: 3px; line-height: 1.3; }
   .hint { font-size: 6px; color: #64748b; margin-top: 5px; border-top: .5px solid #cbd5e1; padding-top: 3px; }
-  @media print { body { padding: 0; } @page { margin: 8mm; } }
+  .toolbar { margin-bottom: 6mm; font-size: 12px; color: #475569; }
+  .toolbar button { font: inherit; padding: 6px 14px; border: 1px solid #0f766e; background: #0f766e; color: #fff; border-radius: 6px; cursor: pointer; }
+  @media print { body { padding: 0; } .toolbar { display: none; } @page { margin: 8mm; } }
 </style>
 </head>
 <body>
-  <div class="label">
-    <div class="brand">BEMMS</div>
-    <div class="inst">${esc(INSTITUTION_NAME)}</div>
-    <img src="${qrBlobUrl}" alt="QR code for ${esc(viewingEquipment.id)}" />
-    <div class="id">${esc(viewingEquipment.id)}</div>
-    <div class="name">${esc(viewingEquipment.name)}</div>
-    <div class="meta">${esc(viewingEquipment.manufacturer)} ${esc(viewingEquipment.modelNumber)}<br />S/N ${esc(viewingEquipment.serialNumber)}<br />${esc(viewingEquipment.ward)}${
-      viewingEquipment.powerRating ? `<br />${esc(viewingEquipment.powerRating)}` : ''
-    }</div>
-    <div class="hint">Scan with any phone camera to view service history</div>
+  <div class="toolbar">
+    <button onclick="window.print()">Print ${labels.length} label${labels.length === 1 ? '' : 's'}</button>
+    &nbsp; Cut along the borders and attach one to each unit.
   </div>
+  <div class="sheet">${body}</div>
   <script>
-    window.addEventListener('load', function () {
-      window.focus();
-      window.print();
-    });
+    window.addEventListener('load', function () { window.focus(); window.print(); });
   <\/script>
 </body>
 </html>`);
     win.document.close();
+  };
+
+  const handlePrintLabel = () => {
+    if (viewingEquipment) void printLabelSheet([viewingEquipment]);
+  };
+
+  /** Prints labels for every device currently matching the search and filters. */
+  const handlePrintFilteredLabels = () => {
+    if (filteredEquipment.length === 0) {
+      alert('No devices match the current filters, so there are no labels to print.');
+      return;
+    }
+    if (!confirm(`Print ${filteredEquipment.length} QR label${filteredEquipment.length === 1 ? '' : 's'} for the devices currently listed?`)) {
+      return;
+    }
+    void printLabelSheet(filteredEquipment);
   };
 
   // Filter list
@@ -348,7 +417,7 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
     const textMatch =
       eq.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       eq.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      eq.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (eq.serialNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (eq.assetNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       eq.ward.toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -377,7 +446,18 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
             <QrCode className="w-4 h-4 text-teal-400" />
             <span>Scan QR</span>
           </button>
-          
+
+          <button
+            id="print-labels-btn"
+            onClick={handlePrintFilteredLabels}
+            disabled={filteredEquipment.length === 0}
+            title="Prints a label sheet for every device currently listed. Search or filter first to narrow it down."
+            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 font-mono text-xs font-semibold rounded-xl border border-slate-800 hover:border-teal-500/20 transition flex items-center space-x-2 cursor-pointer"
+          >
+            <Printer className="w-4 h-4 text-teal-400" />
+            <span>Print {filteredEquipment.length} label{filteredEquipment.length === 1 ? '' : 's'}</span>
+          </button>
+
           <button
             id="add-equipment-btn"
             onClick={() => setShowAddForm(!showAddForm)}
@@ -388,6 +468,45 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
           </button>
         </div>
       </div>
+
+      {/* Just-registered batch: print its labels without hunting for them */}
+      {lastBatchIds.length > 1 && (
+        <div className="p-4 rounded-xl bg-teal-500/10 border border-teal-500/25 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-teal-300">
+              {lastBatchIds.length} units registered — {lastBatchIds[0]} to {lastBatchIds[lastBatchIds.length - 1]}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+              Print the batch as one sheet, then cut and attach a label to each unit.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                const batch = equipment.filter((eq) => lastBatchIds.includes(eq.id));
+                if (batch.length === 0) {
+                  alert('These units are still syncing. Give it a moment and try again.');
+                  return;
+                }
+                void printLabelSheet(batch);
+              }}
+              className="px-3 py-2 bg-teal-500 hover:bg-teal-400 text-slate-950 text-[11px] font-bold rounded-lg transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print {lastBatchIds.length} labels</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setLastBatchIds([])}
+              className="text-[10px] font-mono uppercase text-slate-400 hover:text-white transition cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Scan panel: camera first, manual entry as a fallback */}
       {scanOpen && (
