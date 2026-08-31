@@ -81,6 +81,11 @@ interface AppContextType {
   
   // Data actions. The add* methods allocate the record ID and return it.
   addEquipment: (eq: Omit<Equipment, 'id' | 'createdAt'>) => Promise<string>;
+  /** Registers `quantity` identical units, each with its own ID and QR label. */
+  addEquipmentBatch: (
+    eq: Omit<Equipment, 'id' | 'createdAt'>,
+    quantity: number,
+  ) => Promise<BatchRegistrationResult>;
   updateEquipmentStatus: (id: string, status: Equipment['status']) => Promise<void>;
   /** Amends a registered device. Administrators only, enforced by the rules. */
   updateEquipment: (id: string, changes: EquipmentEdit) => Promise<void>;
@@ -91,6 +96,18 @@ interface AppContextType {
   notifyAssignment: (input: AssignmentNotificationInput) => Promise<void>;
   markNotificationRead: (id: string) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
+}
+
+/** Upper bound on one bulk registration, to catch a mistyped quantity. */
+export const MAX_BULK_REGISTRATION = 100;
+
+/** Outcome of a bulk registration, including a partial run. */
+export interface BatchRegistrationResult {
+  /** IDs successfully created, in order. */
+  created: string[];
+  /** 1-based position of the unit that failed, if any. */
+  failedAt?: number;
+  error?: string;
 }
 
 /** The fields of a registered device an administrator may amend. */
@@ -354,6 +371,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  /**
+   * Registers several identical units in one go — a ward taking delivery of ten
+   * beds should not have to fill the form ten times.
+   *
+   * Each unit still becomes its own record with its own ID and QR label, so they
+   * remain individually trackable once the labels are attached. IDs are claimed
+   * one at a time rather than in a batch write, because the transactional claim
+   * is what stops two people registering at the same moment from colliding.
+   */
+  const addEquipmentBatch = async (
+    eq: Omit<Equipment, 'id' | 'createdAt'>,
+    quantity: number,
+  ): Promise<BatchRegistrationResult> => {
+    if (!currentUser) throw new Error('You must be signed in to register equipment.');
+
+    const total = Math.floor(quantity);
+    if (!Number.isFinite(total) || total < 1) {
+      throw new Error('Enter how many units to register.');
+    }
+    if (total > MAX_BULK_REGISTRATION) {
+      throw new Error(`Register at most ${MAX_BULK_REGISTRATION} units at a time.`);
+    }
+
+    const created: string[] = [];
+    let nextNumber = nextSequenceStart(EQUIPMENT_ID_PREFIX, equipment);
+
+    for (let i = 0; i < total; i++) {
+      try {
+        const id = await createWithUniqueId('equipment', EQUIPMENT_ID_PREFIX, nextNumber, eq);
+        created.push(id);
+
+        // Start the next search past the ID just taken. The local equipment list
+        // does not update mid-loop, so without this every unit would re-scan
+        // from the same number.
+        const parsed = Number(id.slice(EQUIPMENT_ID_PREFIX.length));
+        nextNumber = Number.isFinite(parsed) ? parsed + 1 : nextNumber + 1;
+      } catch (err) {
+        // Report what actually got saved rather than implying none of it did.
+        return {
+          created,
+          failedAt: i + 1,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    }
+
+    return { created };
+  };
+
   const updateEquipment = async (id: string, changes: EquipmentEdit) => {
     if (currentUser?.role !== 'admin') {
       throw new Error('Only a System Administrator can amend a registered device.');
@@ -530,6 +596,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loginWithEmail,
         logout,
         addEquipment,
+        addEquipmentBatch,
         updateEquipment,
         updateEquipmentStatus,
         addJob,

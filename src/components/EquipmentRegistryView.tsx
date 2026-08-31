@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApp, type EquipmentEdit } from '../context/AppContext';
+import { useApp, MAX_BULK_REGISTRATION, type EquipmentEdit } from '../context/AppContext';
 import { Equipment, EquipmentStatus } from '../types';
 import {
   INSTITUTION_NAME,
@@ -36,7 +36,9 @@ interface EquipmentRegistryViewProps {
 }
 
 export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegistryViewProps = {}) {
-  const { equipment, addEquipment, updateEquipment, deleteEquipment, currentUser } = useApp();
+  const {
+    equipment, addEquipment, addEquipmentBatch, updateEquipment, deleteEquipment, currentUser,
+  } = useApp();
 
   // Amending a registered device is a System Administrator action.
   const canEdit = currentUser?.role === 'admin';
@@ -60,6 +62,12 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
   const [powerRating, setPowerRating] = useState('');
   const [status, setStatus] = useState<EquipmentStatus>('Active');
   const [photoUrl, setPhotoUrl] = useState('');
+  // How many identical units to register in one submission.
+  const [quantity, setQuantity] = useState('1');
+  const [registering, setRegistering] = useState(false);
+
+  const quantityNum = Math.floor(Number(quantity)) || 1;
+  const isBulk = quantityNum > 1;
 
   // Edit state. The device being amended, plus a working copy of its fields.
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
@@ -99,31 +107,40 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !manufacturer || !modelNumber || !serialNumber) {
+    if (!name || !manufacturer || !modelNumber) {
       alert('Please fill out all required fields to register the equipment.');
+      return;
+    }
+    // A single device is identified by its serial; a batch of identical units is
+    // identified by the device ID on each label instead.
+    if (!isBulk && !serialNumber.trim()) {
+      alert('The serial number is required when registering a single device.');
       return;
     }
     if (!powerRating.trim()) {
       alert('The power rating is required. Copy it from the device nameplate.');
       return;
     }
+    if (quantityNum < 1 || quantityNum > MAX_BULK_REGISTRATION) {
+      alert(`Quantity must be between 1 and ${MAX_BULK_REGISTRATION}.`);
+      return;
+    }
 
-    try {
-      const newId = await addEquipment({
-        name,
-        manufacturer,
-        modelNumber,
-        serialNumber,
-        assetNumber,
-        ward,
-        status,
-        powerRating: powerRating.trim(),
-        // Left blank when no photo was supplied; the registry renders a
-        // placeholder rather than storing an unrelated stock image.
-        photoUrl: photoUrl.trim(),
-      });
+    const details = {
+      name,
+      manufacturer,
+      modelNumber,
+      serialNumber: serialNumber.trim(),
+      assetNumber,
+      ward,
+      status,
+      powerRating: powerRating.trim(),
+      // Left blank when no photo was supplied; the registry renders a
+      // placeholder rather than storing an unrelated stock image.
+      photoUrl: photoUrl.trim(),
+    };
 
-      // Reset Form
+    const resetForm = () => {
       setName('');
       setManufacturer('');
       setModelNumber('');
@@ -131,12 +148,42 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
       setAssetNumber('');
       setPowerRating('');
       setPhotoUrl('');
+      setQuantity('1');
       setShowAddForm(false);
+    };
 
-      alert(`Device registered successfully as ${newId}.`);
+    setRegistering(true);
+    try {
+      if (!isBulk) {
+        const newId = await addEquipment(details);
+        resetForm();
+        alert(`Device registered successfully as ${newId}.`);
+        return;
+      }
+
+      const result = await addEquipmentBatch(details, quantityNum);
+      const { created, failedAt, error } = result;
+
+      if (created.length > 0) resetForm();
+
+      if (failedAt) {
+        alert(
+          created.length > 0
+            ? `Registered ${created.length} of ${quantityNum} units (${created[0]} to ${created[created.length - 1]}), then unit ${failedAt} failed: ${error}\n\nThe units already saved are in the registry. Register the remaining ${quantityNum - created.length} separately.`
+            : `No units were registered. ${error}`
+        );
+        return;
+      }
+
+      alert(
+        `Registered ${created.length} units: ${created[0]} to ${created[created.length - 1]}.\n\n` +
+        `Each has its own QR label — print them from the registry and attach one to each unit.`
+      );
     } catch (err: any) {
       console.error('Equipment registration failed:', err);
       alert(`Could not register this device: ${err?.message || err}`);
+    } finally {
+      setRegistering(false);
     }
   };
 
@@ -456,16 +503,24 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
             </div>
 
             <div>
-              <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Serial Number *</label>
+              <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">
+                Serial Number {isBulk ? '(Optional)' : '*'}
+              </label>
               <input
                 id="form-eq-serial"
                 type="text"
-                required
-                placeholder="e.g. SN-829104820"
+                required={!isBulk}
+                placeholder={isBulk ? 'Usually left blank for identical units' : 'e.g. SN-829104820'}
                 value={serialNumber}
                 onChange={(e) => setSerialNumber(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none"
               />
+              {isBulk && (
+                <p className="text-[9.5px] font-mono text-amber-400/80 mt-1 leading-relaxed">
+                  Anything entered here is copied to all {quantityNum} units. Leave blank unless they
+                  genuinely share a serial.
+                </p>
+              )}
             </div>
 
             <div>
@@ -478,6 +533,26 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
                 onChange={(e) => setAssetNumber(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none"
               />
+            </div>
+
+            {/* Quantity — registers this many identical units at once */}
+            <div>
+              <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">Quantity</label>
+              <input
+                id="form-eq-quantity"
+                type="number"
+                min={1}
+                max={MAX_BULK_REGISTRATION}
+                step={1}
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 focus:border-teal-500 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none"
+              />
+              <p className={`text-[9.5px] font-mono mt-1 leading-relaxed ${isBulk ? 'text-teal-400' : 'text-slate-500'}`}>
+                {isBulk
+                  ? `Creates ${quantityNum} separate records, each with its own device ID and QR label.`
+                  : 'For identical items — beds, wheelchairs, drip stands — raise this instead of repeating the form.'}
+              </p>
             </div>
 
             {/* Ward Allocation */}
@@ -544,9 +619,14 @@ export default function EquipmentRegistryView({ onOpenHistory }: EquipmentRegist
           <button
             id="form-eq-submit-btn"
             type="submit"
-            className="w-full py-3 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-bold text-xs uppercase tracking-wider rounded-xl transition"
+            disabled={registering}
+            className="w-full py-3 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-bold text-xs uppercase tracking-wider rounded-xl transition cursor-pointer"
           >
-            Authorized Database Record Creation
+            {registering
+              ? `Registering${isBulk ? ` ${quantityNum} units` : ''}…`
+              : isBulk
+                ? `Register ${quantityNum} Units`
+                : 'Authorized Database Record Creation'}
           </button>
         </form>
       )}
